@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+build/
+*.local
+
+# Environment variables and secrets
+# (Supabase service role key and VAPID private key must never be committed)
+.env
+.env.*
+!.env.example
+supabase/.env
+supabase/functions/.env
+supabase/functions/**/.env
+
+# Supabase local dev
+supabase/.branches/
+supabase/.temp/
+supabase/.import_map.json
+
+# Database dumps and backups (keep backups outside the repo)
+*.dump
+*.backup
+backups/
+dump*.sql
+
+# Tests
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.vitest/
+
+# Deployment
+.vercel/
+.wrangler/
+.netlify/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Caches
+.cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.vite/
+
+# Editor and IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
