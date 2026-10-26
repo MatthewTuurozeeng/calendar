@@ -1,5 +1,5 @@
 import { format, setHours, startOfDay } from 'date-fns'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { inputClass, secondaryButtonClass } from '../../components/ui/form'
 import { Switch } from '../../components/ui/Switch'
 import { browserTimeZone, timeZoneOptions } from '../../lib/dates'
@@ -50,7 +50,7 @@ const REMINDER_CHOICES = [0, 5, 10, 15, 30, 60, 1440]
 export function SettingsPage() {
   const { profile, updateProfile } = useUserData()
   const { status, track, dismiss } = useSaveStatus()
-  const activeSection = useActiveSection()
+  const { active: activeSection, pick: pickSection } = useActiveSection()
 
   const calendar = calendarPrefs(profile)
   const notifications = notificationPrefs(profile)
@@ -84,6 +84,7 @@ export function SettingsPage() {
             <li key={id}>
               <a
                 href={`#${id}`}
+                onClick={() => pickSection(id)}
                 aria-current={activeSection === id ? 'true' : undefined}
                 className={`flex min-h-10 items-center rounded-xl px-3 text-sm ${
                   activeSection === id ? 'bg-soft-rose/45 font-semibold' : 'text-ink-muted hover:bg-surface'
@@ -309,32 +310,46 @@ export function SettingsPage() {
   )
 }
 
-/** The section nearest the top of the viewport, for the side navigation. */
+/** The section at the top of the viewport, for the side navigation. */
 function useActiveSection() {
   const [active, setActive] = useState(SECTIONS[0].id)
+  // A section picked in the nav. Near the bottom of the page several short
+  // sections are on screen at once, so the click decides until the user scrolls up.
+  const picked = useRef<string | null>(null)
 
   useEffect(() => {
-    const visible = new Map<string, number>()
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) visible.set(entry.target.id, entry.boundingClientRect.top)
-          else visible.delete(entry.target.id)
-        }
-        const first = SECTIONS.find(({ id }) => visible.has(id))
-        if (first) setActive(first.id)
-      },
-      // A band near the top of the screen, below the sticky header.
-      { rootMargin: '-80px 0px -55% 0px' },
-    )
-    for (const { id } of SECTIONS) {
-      const el = document.getElementById(id)
-      if (el) observer.observe(el)
+    const update = () => {
+      const root = document.documentElement
+      const atBottom = window.innerHeight + window.scrollY >= root.scrollHeight - 2
+      if (atBottom) {
+        setActive(picked.current ?? SECTIONS[SECTIONS.length - 1].id)
+        return
+      }
+      picked.current = null
+      // The last section whose top has passed the sticky header.
+      let current = SECTIONS[0].id
+      for (const { id } of SECTIONS) {
+        const el = document.getElementById(id)
+        if (el && el.getBoundingClientRect().top <= 120) current = id
+      }
+      setActive(current)
     }
-    return () => observer.disconnect()
+
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
   }, [])
 
-  return active
+  const pick = (id: string) => {
+    picked.current = id
+    setActive(id)
+  }
+
+  return { active, pick }
 }
 
 function DisplayNameInput({ value, onSave }: { value: string; onSave: (name: string) => void }) {
