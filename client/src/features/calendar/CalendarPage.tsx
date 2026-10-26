@@ -13,6 +13,7 @@ import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUserData } from '../auth/user-data'
+import { calendarPrefs, type CalendarPrefs } from '../settings/prefs'
 import { eventChanges, fetchEventsInRange, updateEvent, type EventRow } from '../events/api'
 import { EventDialog } from '../events/EventDialog'
 import { timingToColumns, withDefaultEnd, type EventTiming } from '../events/timing'
@@ -23,20 +24,24 @@ const INK = '#29272A'
 
 type DialogState = { event: EventRow } | { timing: EventTiming } | null
 
-function initialView(): CalendarView {
+function initialView(preferred: CalendarPrefs['default_view']): CalendarView {
+  if (preferred !== 'auto') return preferred
   // Agenda is the default on narrow screens (README §4.1).
   return window.matchMedia('(max-width: 767px)').matches ? 'listWeek' : 'timeGridWeek'
 }
 
 export function CalendarPage() {
-  const { profile, categories } = useUserData()
+  const { profile, allCategories } = useUserData()
+  const prefs = calendarPrefs(profile)
+  const hour12 = prefs.time_format === '12h'
   const calendarRef = useRef<FullCalendar>(null)
   const [title, setTitle] = useState('')
-  const [view, setView] = useState<CalendarView>(initialView)
+  const [view, setView] = useState<CalendarView>(() => initialView(prefs.default_view))
   const [loadError, setLoadError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState>(null)
 
-  const colorByCategory = useMemo(() => new Map(categories.map((c) => [c.id, c.color])), [categories])
+  // Includes archived categories, so past events keep their color.
+  const colorByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.color])), [allCategories])
 
   const loadEvents = useCallback(
     async (range: EventSourceFuncArg): Promise<EventInput[]> => {
@@ -126,6 +131,8 @@ export function CalendarPage() {
           headerToolbar={false}
           height="100%"
           firstDay={profile.week_starts_on}
+          weekends={prefs.show_weekends}
+          weekNumbers={prefs.show_week_numbers}
           events={loadEvents}
           datesSet={handleDatesSet}
           selectable
@@ -135,11 +142,12 @@ export function CalendarPage() {
           eventClick={handleEventClick}
           eventChange={handleEventChange}
           nowIndicator
-          scrollTime="06:00:00"
+          scrollTime={`${String(prefs.day_start_hour).padStart(2, '0')}:00:00`}
           allDayText="All day"
           dayMaxEventRows={3}
           noEventsContent="Nothing scheduled"
-          slotLabelFormat={{ hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' }}
+          slotLabelFormat={{ hour: 'numeric', minute: '2-digit', omitZeroMinute: hour12, meridiem: 'short', hour12 }}
+          eventTimeFormat={{ hour: 'numeric', minute: '2-digit', omitZeroMinute: hour12, meridiem: 'short', hour12 }}
         />
       </div>
 

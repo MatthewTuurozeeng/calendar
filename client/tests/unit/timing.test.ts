@@ -47,6 +47,11 @@ describe('defaultTiming', () => {
       end: new Date(2026, 9, 26, 16),
     })
   })
+
+  it('uses the preferred duration', () => {
+    const timing = defaultTiming(new Date(2026, 9, 26, 14, 20), 30)
+    expect(timing.end).toEqual(new Date(2026, 9, 26, 15, 30))
+  })
 })
 
 describe('withDefaultEnd', () => {
