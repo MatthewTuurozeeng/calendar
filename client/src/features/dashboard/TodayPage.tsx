@@ -3,12 +3,14 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Link } from 'react-router'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { secondaryButtonClass } from '../../components/ui/form'
-import { PlusIcon } from '../../components/ui/icons'
+import { PlusIcon, RepeatIcon } from '../../components/ui/icons'
 import { toDateString } from '../../lib/dates'
 import { useNow } from '../../lib/use-now'
 import { useUserData } from '../auth/user-data'
-import { eventChanges, fetchEventsInRange, type EventRow } from '../events/api'
+import { eventChanges } from '../events/api'
 import { EventDialog } from '../events/EventDialog'
+import { fetchOccurrences } from '../recurrence/api'
+import type { Occurrence } from '../recurrence/expand'
 import { calendarPrefs, dashboardPrefs } from '../settings/prefs'
 import type { Task } from '../tasks/api'
 import { TaskDialog } from '../tasks/TaskDialog'
@@ -18,13 +20,16 @@ import { tasksForView } from '../tasks/views'
 
 const UNCATEGORIZED_COLOR = '#E7E2E0'
 
-type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; events: EventRow[] }
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; events: Occurrence[] }
 
 export function TodayPage() {
   const { profile, allCategories } = useUserData()
   const now = useNow()
   const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [editing, setEditing] = useState<EventRow | null>(null)
+  const [editing, setEditing] = useState<Occurrence | null>(null)
   const { state: tasksState, reload: reloadTasks } = useTasks()
   const [taskDialog, setTaskDialog] = useState<{ task?: Task } | null>(null)
   const [taskError, setTaskError] = useState<string | null>(null)
@@ -64,10 +69,10 @@ export function TodayPage() {
   }
 
   const events = state.status === 'ready' ? state.events : []
-  const next = events.filter((e) => !e.all_day).find((e) => new Date(e.end_at!) > now)
+  const next = events.find((e) => !e.timing.allDay && e.timing.end > now)
 
-  const timeRange = (e: EventRow) =>
-    e.all_day ? 'All day' : `${format(new Date(e.start_at!), timeFormat)} – ${format(new Date(e.end_at!), timeFormat)}`
+  const timeRange = ({ timing }: Occurrence) =>
+    timing.allDay ? 'All day' : `${format(timing.start, timeFormat)} – ${format(timing.end, timeFormat)}`
 
   const eventsStatus =
     state.status === 'loading' ? (
@@ -96,7 +101,7 @@ export function TodayPage() {
           {eventsStatus ?? (
             <div className="p-5">
               <h2 id="next-event" className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
-                {next && new Date(next.start_at!) <= now ? 'Happening now' : 'Next up'}
+                {next && next.timing.start <= now ? 'Happening now' : 'Next up'}
               </h2>
               {next ? (
                 <button type="button" onClick={() => setEditing(next)} className="mt-2 block w-full text-left">
@@ -106,9 +111,9 @@ export function TodayPage() {
                     {next.location && ` · ${next.location}`}
                   </p>
                   <p className="mt-3 inline-flex rounded-full bg-warm-peach/30 px-3 py-1 text-sm font-medium">
-                    {new Date(next.start_at!) <= now
-                      ? `Ends in ${formatDistanceStrict(new Date(next.end_at!), now)}`
-                      : `Starts in ${formatDistanceStrict(new Date(next.start_at!), now)}`}
+                    {next.timing.start <= now
+                      ? `Ends in ${formatDistanceStrict(next.timing.end, now)}`
+                      : `Starts in ${formatDistanceStrict(next.timing.start, now)}`}
                   </p>
                 </button>
               ) : (
@@ -191,10 +196,10 @@ export function TodayPage() {
             ) : (
               <ul className="divide-y divide-line">
                 {events.map((e) => {
-                  const past = !e.all_day && new Date(e.end_at!) <= now
+                  const past = !e.timing.allDay && e.timing.end <= now
                   const category = e.category_id ? nameByCategory.get(e.category_id) : undefined
                   return (
-                    <li key={e.id}>
+                    <li key={e.key}>
                       <button
                         type="button"
                         onClick={() => setEditing(e)}
@@ -212,8 +217,16 @@ export function TodayPage() {
                           aria-hidden="true"
                         />
                         <span className="min-w-0 flex-1">
-                          <span className={`block truncate font-medium ${past ? 'line-through decoration-ink/30' : ''}`}>
-                            {e.title}
+                          <span
+                            className={`flex items-center gap-1.5 font-medium ${past ? 'line-through decoration-ink/30' : ''}`}
+                          >
+                            <span className="truncate">{e.title}</span>
+                            {e.original && (
+                              <>
+                                <RepeatIcon className="size-3.5 text-ink-muted" />
+                                <span className="sr-only">(repeats)</span>
+                              </>
+                            )}
                           </span>
                           {(category || e.location) && (
                             <span className="block truncate text-sm text-ink-muted">
@@ -230,7 +243,7 @@ export function TodayPage() {
         </Card>
       )}
 
-      {editing && <EventDialog event={editing} onClose={() => setEditing(null)} />}
+      {editing && <EventDialog occurrence={editing} onClose={() => setEditing(null)} />}
       {taskDialog && (
         <TaskDialog
           {...(taskDialog.task ? { task: taskDialog.task } : { defaultDueDate: toDateString(now) })}
@@ -270,17 +283,9 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 async function loadToday(): Promise<LoadState> {
   const start = startOfDay(new Date())
   try {
-    const rows = await fetchEventsInRange(start, addDays(start, 1))
-    return { status: 'ready', events: sortForDay(rows) }
+    // Sorted with all-day events first, then by start.
+    return { status: 'ready', events: await fetchOccurrences(start, addDays(start, 1)) }
   } catch (err) {
     return { status: 'error', message: err instanceof Error ? err.message : 'Could not load today.' }
   }
-}
-
-/** All-day events first, then timed events by start. */
-function sortForDay(rows: EventRow[]): EventRow[] {
-  return [...rows].sort((a, b) => {
-    if (a.all_day !== b.all_day) return a.all_day ? -1 : 1
-    return (a.start_at ?? a.start_date ?? '').localeCompare(b.start_at ?? b.start_date ?? '')
-  })
 }
