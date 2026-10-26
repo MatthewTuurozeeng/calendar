@@ -7,22 +7,26 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../../components/ui/form'
-import { XIcon } from '../../components/ui/icons'
+import { CalendarPlusIcon, XIcon } from '../../components/ui/icons'
 import { parseLocal, toDateString, toTimeString } from '../../lib/dates'
 import { validateTask, type FieldErrors } from '../../lib/validation'
 import { useSession } from '../auth/auth-context'
 import { useUserData } from '../auth/user-data'
-import { formatOffset } from '../settings/prefs'
+import { calendarPrefs, formatOffset } from '../settings/prefs'
 import {
   createTask,
   deleteTask,
+  removeTimeBlock,
   statusColumns,
   updateTask,
   type SubtaskDraft,
   type Task,
   type TaskPriority,
   type TaskStatus,
+  type TimeBlock,
 } from './api'
+import { ScheduleTaskDialog } from './ScheduleTaskDialog'
+import { blockLabel } from './views'
 
 type TaskDialogProps = {
   /** The task to edit, or omit to create one. */
@@ -93,7 +97,7 @@ function initialForm(task: Task | undefined, defaultDueDate: string | null | und
 
 export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
   const session = useSession()
-  const { categories } = useUserData()
+  const { profile, categories } = useUserData()
   const titleId = useId()
   const [form, setForm] = useState(() => initialForm(task, defaultDueDate))
   const [newSubtask, setNewSubtask] = useState('')
@@ -101,6 +105,21 @@ export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // Blocks save straight away, separately from the task form.
+  const [blocks, setBlocks] = useState<TimeBlock[]>(task?.events ?? [])
+  const [scheduling, setScheduling] = useState(false)
+  const [now] = useState(() => new Date())
+  const timeFormat = calendarPrefs(profile).time_format === '24h' ? 'HH:mm' : 'h:mm a'
+
+  async function removeBlock(id: string) {
+    setSaveError(null)
+    try {
+      await removeTimeBlock(id)
+      setBlocks((prev) => prev.filter((b) => b.id !== id))
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not remove the time block.')
+    }
+  }
 
   function update(patch: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...patch }))
@@ -392,6 +411,43 @@ export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
           />
         </fieldset>
 
+        {task && (
+          <fieldset>
+            <legend className={labelClass}>Time blocks</legend>
+            {blocks.length > 0 && (
+              <ul className="mb-2 flex flex-col">
+                {blocks.map((b) => (
+                  <li key={b.id} className="flex items-center justify-between gap-2 rounded-xl px-1">
+                    <span className="text-sm">
+                      {blockLabel(b, now, timeFormat)}
+                      {b.rrule && <span className="text-ink-muted"> · repeats</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void removeBlock(b.id)}
+                      className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-xl text-ink-muted hover:bg-canvas hover:text-ink"
+                      aria-label={`Remove time block ${blockLabel(b, now, timeFormat)}`}
+                    >
+                      <XIcon className="size-5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() => setScheduling(true)}
+              className={`${secondaryButtonClass} gap-2`}
+            >
+              <CalendarPlusIcon className="size-5" />
+              Schedule time
+            </button>
+            <p className="mt-1 text-xs text-ink-muted">
+              Blocks appear on your calendar. Completing the task keeps them.
+            </p>
+          </fieldset>
+        )}
+
         <div>
           <label htmlFor="task-description" className={labelClass}>
             Notes <span className="font-normal text-ink-muted">(optional)</span>
@@ -442,6 +498,14 @@ export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
           </div>
         </div>
       </form>
+
+      {task && scheduling && (
+        <ScheduleTaskDialog
+          task={task}
+          onScheduled={(block) => setBlocks((prev) => [...prev, block])}
+          onClose={() => setScheduling(false)}
+        />
+      )}
     </Dialog>
   )
 }

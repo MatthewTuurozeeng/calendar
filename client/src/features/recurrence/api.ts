@@ -33,7 +33,7 @@ export async function fetchOccurrences(start: Date, end: Date): Promise<Occurren
 
   const { data: events, error } = await supabase
     .from('events')
-    .select('*')
+    .select('*, task:tasks(id, status)')
     .or(
       [
         `and(rrule.is.null,all_day.is.false,start_at.lt.${endIso},end_at.gt.${startIso})`,
@@ -50,7 +50,9 @@ export async function fetchOccurrences(start: Date, end: Date): Promise<Occurren
   for (const x of exceptions) byEvent.set(x.event_id, [...(byEvent.get(x.event_id) ?? []), x])
 
   return events
-    .flatMap((e) => expandEvent(e, byEvent.get(e.id) ?? [], start, end))
+    .flatMap(({ task, ...row }) =>
+      expandEvent(row, byEvent.get(row.id) ?? [], start, end).map((o) => ({ ...o, task })),
+    )
     .sort(compareOccurrences)
 }
 

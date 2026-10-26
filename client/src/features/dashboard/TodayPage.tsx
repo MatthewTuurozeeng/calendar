@@ -12,7 +12,7 @@ import { EventDialog } from '../events/EventDialog'
 import { fetchOccurrences } from '../recurrence/api'
 import type { Occurrence } from '../recurrence/expand'
 import { calendarPrefs, dashboardPrefs } from '../settings/prefs'
-import type { Task } from '../tasks/api'
+import { taskChanges, type Task } from '../tasks/api'
 import { TaskDialog } from '../tasks/TaskDialog'
 import { TaskItem } from '../tasks/TaskItem'
 import { useTasks } from '../tasks/use-tasks'
@@ -55,8 +55,13 @@ export function TodayPage() {
     }
   }, [dayKey, attempt])
   useEffect(() => {
+    // Task blocks show their task's completion, so task changes reload events too.
     eventChanges.addEventListener('change', reload)
-    return () => eventChanges.removeEventListener('change', reload)
+    taskChanges.addEventListener('change', reload)
+    return () => {
+      eventChanges.removeEventListener('change', reload)
+      taskChanges.removeEventListener('change', reload)
+    }
   }, [reload])
 
   if (!sections.next_event && !sections.timeline && !sections.tasks) {
@@ -196,7 +201,7 @@ export function TodayPage() {
             ) : (
               <ul className="divide-y divide-line">
                 {events.map((e) => {
-                  const past = !e.timing.allDay && e.timing.end <= now
+                  const past = (!e.timing.allDay && e.timing.end <= now) || e.task?.status === 'completed'
                   const category = e.category_id ? nameByCategory.get(e.category_id) : undefined
                   return (
                     <li key={e.key}>
@@ -228,9 +233,11 @@ export function TodayPage() {
                               </>
                             )}
                           </span>
-                          {(category || e.location) && (
+                          {(e.task || category || e.location) && (
                             <span className="block truncate text-sm text-ink-muted">
-                              {[category, e.location].filter(Boolean).join(' · ')}
+                              {[e.task && (e.task.status === 'completed' ? 'Task · done' : 'Task'), category, e.location]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </span>
                           )}
                         </span>

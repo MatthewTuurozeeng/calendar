@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { CheckIcon } from '../../components/ui/icons'
+import { CalendarIcon, CalendarPlusIcon, CheckIcon } from '../../components/ui/icons'
 import { useUserData } from '../auth/user-data'
 import { calendarPrefs, formatOffset } from '../settings/prefs'
 import { setTaskStatus, type Task } from './api'
-import { dueLabel, taskView } from './views'
+import { ScheduleTaskDialog } from './ScheduleTaskDialog'
+import { blockLabel, dueLabel, taskView, upcomingBlocks } from './views'
 
 type TaskItemProps = {
   task: Task
@@ -19,6 +20,7 @@ export function TaskItem({ task, now, onOpen, onError, hideDue }: TaskItemProps)
   const { profile, allCategories } = useUserData()
   // Shows the tick at once; the list moves the task after the reload.
   const [optimisticDone, setOptimisticDone] = useState<boolean | null>(null)
+  const [scheduling, setScheduling] = useState(false)
 
   const done = optimisticDone ?? task.status === 'completed'
   const overdue = !done && taskView(task, now) === 'overdue'
@@ -26,6 +28,7 @@ export function TaskItem({ task, now, onOpen, onError, hideDue }: TaskItemProps)
   const timeFormat = calendarPrefs(profile).time_format === '24h' ? 'HH:mm' : 'h:mm a'
   const due = hideDue ? null : dueLabel(task, now, timeFormat)
   const subtasksDone = task.task_subtasks.filter((s) => s.is_completed).length
+  const [nextBlock] = upcomingBlocks(task.events, now)
 
   async function toggle() {
     const next = !done
@@ -81,6 +84,13 @@ export function TaskItem({ task, now, onOpen, onError, hideDue }: TaskItemProps)
             </span>
           )}
           {task.estimated_minutes && <span>{formatOffset(task.estimated_minutes).replace(/minutes?/, 'min')}</span>}
+          {nextBlock && !done && (
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarIcon className="size-3.5" />
+              <span className="sr-only">Scheduled</span>
+              {blockLabel(nextBlock, now, timeFormat)}
+            </span>
+          )}
           {category && (
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 rounded-full" style={{ backgroundColor: category.color }} aria-hidden="true" />
@@ -89,6 +99,20 @@ export function TaskItem({ task, now, onOpen, onError, hideDue }: TaskItemProps)
           )}
         </span>
       </button>
+
+      {!done && (
+        <button
+          type="button"
+          onClick={() => setScheduling(true)}
+          aria-label={`Schedule ${task.title}`}
+          title="Schedule on calendar"
+          className="grid min-h-14 min-w-11 shrink-0 place-items-center text-ink-muted hover:text-ink"
+        >
+          <CalendarPlusIcon className="size-5" />
+        </button>
+      )}
+
+      {scheduling && <ScheduleTaskDialog task={task} onClose={() => setScheduling(false)} />}
     </div>
   )
 }

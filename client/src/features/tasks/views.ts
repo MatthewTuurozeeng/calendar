@@ -1,6 +1,19 @@
-import { addDays, differenceInCalendarDays, endOfDay, format, isSameDay, isSameYear } from 'date-fns'
+import {
+  addDays,
+  addHours,
+  addMinutes,
+  differenceInCalendarDays,
+  endOfDay,
+  format,
+  isSameDay,
+  isSameYear,
+  setHours,
+  startOfDay,
+  startOfHour,
+} from 'date-fns'
 import { parseLocal, toDateString } from '../../lib/dates'
-import type { TaskRow } from './api'
+import { timingFromRow, type EventTiming } from '../events/timing'
+import type { TaskRow, TimeBlock } from './api'
 
 // Which list a task belongs in, and how lists sort and group (README §4.2).
 
@@ -125,4 +138,43 @@ export function defaultDueDate(view: TaskView, now: Date): string | null {
   if (view === 'today') return toDateString(now)
   if (view === 'upcoming') return toDateString(addDays(now, 1))
   return null
+}
+
+/** Blocks that haven't finished yet, soonest first. */
+export function upcomingBlocks(blocks: TimeBlock[], now: Date): TimeBlock[] {
+  return blocks
+    .map((block) => ({ block, timing: timingFromRow(block) }))
+    .filter(({ timing }) => timing.end > now)
+    .sort((a, b) => a.timing.start.getTime() - b.timing.start.getTime())
+    .map(({ block }) => block)
+}
+
+/** 'Tomorrow, 3:00 PM – 4:30 PM' or 'Mon 2 Nov, all day'. */
+export function blockLabel(block: TimeBlock, now: Date, timeFormat = 'h:mm a'): string {
+  const timing = timingFromRow(block)
+  const day = dayLabel(timing.start, now)
+  if (timing.allDay) return `${day}, all day`
+  return `${day}, ${format(timing.start, timeFormat)} – ${format(timing.end, timeFormat)}`
+}
+
+/** Latest hour a same-day block is suggested; later than this it suggests tomorrow morning. */
+const LAST_SUGGESTED_HOUR = 21
+const MORNING_HOUR = 9
+
+/**
+ * A first suggestion for a time block: the next full hour today, or 09:00 on
+ * the due day if that's later. It lasts the task's estimate, else `fallbackMinutes`.
+ */
+export function suggestBlock(
+  task: DueColumns & Pick<TaskRow, 'estimated_minutes'>,
+  now: Date,
+  fallbackMinutes: number,
+): EventTiming {
+  const due = dueMoment(task)
+  let start = addHours(startOfHour(now), 1)
+  if (due && differenceInCalendarDays(due, now) > 0) start = setHours(startOfDay(due), MORNING_HOUR)
+  else if (start.getHours() > LAST_SUGGESTED_HOUR || !isSameDay(start, now)) {
+    start = setHours(startOfDay(addDays(now, 1)), MORNING_HOUR)
+  }
+  return { allDay: false, start, end: addMinutes(start, task.estimated_minutes ?? fallbackMinutes) }
 }
