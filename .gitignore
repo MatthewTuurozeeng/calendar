@@ -14,14 +14,14 @@ build/
 .env
 .env.*
 !.env.example
-supabase/.env
-supabase/functions/.env
-supabase/functions/**/.env
+server/supabase/.env
+server/supabase/functions/.env
+server/supabase/functions/**/.env
 
 # Supabase local dev
-supabase/.branches/
-supabase/.temp/
-supabase/.import_map.json
+server/supabase/.branches/
+server/supabase/.temp/
+server/supabase/.import_map.json
 
 # Database dumps and backups (keep backups outside the repo)
 *.dump

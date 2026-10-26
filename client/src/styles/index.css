@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+/* Sunset Cloud design tokens (README §5). All colors go through these so
+   dark mode can later redefine them without touching components. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Neutrals */
+  --color-canvas: #faf8f6;
+  --color-surface: #ffffff;
+  --color-ink: #29272a;
+  --color-ink-muted: #6b6870;
+  --color-line: #e7e2e0;
+
+  /* Category palette. Text on these is always ink, never white. */
+  --color-dusty-orange: #f08d7e;
+  --color-warm-peach: #efa18a;
+  --color-soft-rose: #e2bab1;
+  --color-periwinkle: #acaec5;
+  --color-rose-pink: #dda6b9;
+
+  --color-accent: var(--color-dusty-orange);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}

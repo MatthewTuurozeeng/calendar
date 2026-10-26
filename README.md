@@ -478,26 +478,33 @@ Free Supabase projects may pause after a period of inactivity, and reminders sto
 ## 8. Project Structure
 
 ```text
-personal-calendar/
-├── public/            manifest.webmanifest, icons/
-├── src/
-│   ├── app/           routes.tsx, providers.tsx
-│   ├── components/    layout/, ui/
-│   ├── features/
-│   │   ├── calendar/  events/  tasks/  categories/
-│   │   ├── recurrence/          # expansion, exceptions, edit scopes
-│   │   ├── reminders/  dashboard/  settings/
-│   │   └── academic/
-│   ├── lib/           supabase.ts, dates.ts, validation.ts
-│   ├── types/         database.ts (generated from Supabase)
-│   ├── styles/
-│   └── main.tsx
-├── supabase/
-│   ├── migrations/
-│   └── functions/     sync-reminders/, send-reminders/
-├── tests/             unit/, e2e/
+calendar/
+├── client/                frontend (Vite + React); run npm scripts here
+│   ├── public/            manifest.webmanifest, icons/
+│   ├── src/
+│   │   ├── app/           routes.tsx, providers.tsx
+│   │   ├── components/    layout/, ui/
+│   │   ├── features/
+│   │   │   ├── calendar/  events/  tasks/  categories/
+│   │   │   ├── recurrence/          # expansion, exceptions, edit scopes
+│   │   │   ├── reminders/  dashboard/  settings/
+│   │   │   └── academic/
+│   │   ├── lib/           supabase.ts, dates.ts, validation.ts
+│   │   ├── types/         database.ts (generated from Supabase)
+│   │   ├── styles/
+│   │   └── main.tsx
+│   ├── tests/             unit/, e2e/
+│   └── .env.local         VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+├── server/                backend; run the Supabase CLI here
+│   └── supabase/
+│       ├── migrations/
+│       └── functions/     sync-reminders/, send-reminders/
 └── README.md
 ```
+
+- Frontend: `cd client && npm install && npm run dev`.
+- Backend: `cd server && supabase db push` (or pass `--workdir server` from the root).
+- Regenerate types: `cd server && supabase gen types typescript --linked > ../client/src/types/database.ts`.
 
 Keep components, hooks and queries inside their feature folder. Don't add abstraction layers before they're needed.
 
