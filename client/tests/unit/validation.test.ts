@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateEvent } from '../../src/lib/validation'
+import { validateEvent, validateTask } from '../../src/lib/validation'
 
 const start = new Date(2026, 9, 26, 9)
 const end = new Date(2026, 9, 26, 10)
@@ -20,5 +20,28 @@ describe('validateEvent', () => {
   it('reports unparseable dates', () => {
     const errors = validateEvent({ title: 'x', start: new Date(NaN), end })
     expect(errors.start).toBeDefined()
+  })
+})
+
+describe('validateTask', () => {
+  const valid = { title: 'Write report', due: null, estimatedMinutes: '' }
+
+  it('accepts a task with only a title', () => {
+    expect(validateTask(valid)).toEqual({})
+  })
+
+  it('requires a title', () => {
+    expect(validateTask({ ...valid, title: '  ' }).title).toBeDefined()
+  })
+
+  it('rejects an invalid due date', () => {
+    expect(validateTask({ ...valid, due: new Date('nope') }).due).toBeDefined()
+  })
+
+  it('needs a positive whole-number estimate', () => {
+    expect(validateTask({ ...valid, estimatedMinutes: '30' })).toEqual({})
+    expect(validateTask({ ...valid, estimatedMinutes: '0' }).estimate).toBeDefined()
+    expect(validateTask({ ...valid, estimatedMinutes: '1.5' }).estimate).toBeDefined()
+    expect(validateTask({ ...valid, estimatedMinutes: 'soon' }).estimate).toBeDefined()
   })
 })

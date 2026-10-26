@@ -21,3 +21,24 @@ export function validateEvent(input: {
 
   return errors
 }
+
+export function validateTask(input: {
+  title: string
+  due: Date | null
+  estimatedMinutes: string
+}): FieldErrors<'title' | 'due' | 'estimate'> {
+  const errors: FieldErrors<'title' | 'due' | 'estimate'> = {}
+  const title = input.title.trim()
+
+  if (!title) errors.title = 'Give the task a title.'
+  else if (title.length > TITLE_MAX_LENGTH) errors.title = `Keep the title under ${TITLE_MAX_LENGTH} characters.`
+
+  if (input.due && !isValid(input.due)) errors.due = 'Enter a valid due date.'
+
+  const estimate = input.estimatedMinutes.trim()
+  if (estimate && !(/^\d+$/.test(estimate) && Number(estimate) > 0)) {
+    errors.estimate = 'Enter a whole number of minutes.'
+  }
+
+  return errors
+}

@@ -1,32 +1,33 @@
 import { addDays, format, formatDistanceStrict, startOfDay } from 'date-fns'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { secondaryButtonClass } from '../../components/ui/form'
+import { PlusIcon } from '../../components/ui/icons'
+import { toDateString } from '../../lib/dates'
+import { useNow } from '../../lib/use-now'
 import { useUserData } from '../auth/user-data'
 import { eventChanges, fetchEventsInRange, type EventRow } from '../events/api'
 import { EventDialog } from '../events/EventDialog'
 import { calendarPrefs, dashboardPrefs } from '../settings/prefs'
+import type { Task } from '../tasks/api'
+import { TaskDialog } from '../tasks/TaskDialog'
+import { TaskItem } from '../tasks/TaskItem'
+import { useTasks } from '../tasks/use-tasks'
+import { tasksForView } from '../tasks/views'
 
 const UNCATEGORIZED_COLOR = '#E7E2E0'
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; events: EventRow[] }
-
-/** Re-renders every minute so countdowns and "now" stay current. */
-function useNow() {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
-  return now
-}
 
 export function TodayPage() {
   const { profile, allCategories } = useUserData()
   const now = useNow()
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [editing, setEditing] = useState<EventRow | null>(null)
+  const { state: tasksState, reload: reloadTasks } = useTasks()
+  const [taskDialog, setTaskDialog] = useState<{ task?: Task } | null>(null)
+  const [taskError, setTaskError] = useState<string | null>(null)
 
   const sections = dashboardPrefs(profile)
   const timeFormat = calendarPrefs(profile).time_format === '24h' ? 'HH:mm' : 'h:mm a'
@@ -53,7 +54,7 @@ export function TodayPage() {
     return () => eventChanges.removeEventListener('change', reload)
   }, [reload])
 
-  if (!sections.next_event && !sections.timeline) {
+  if (!sections.next_event && !sections.timeline && !sections.tasks) {
     return (
       <EmptyState
         title="Your Today page is empty"
@@ -62,107 +63,206 @@ export function TodayPage() {
     )
   }
 
-  if (state.status === 'loading') return <p className="text-sm text-ink-muted">Loading today…</p>
-
-  if (state.status === 'error') {
-    return (
-      <div role="alert" className="rounded-2xl border border-line bg-surface p-5">
-        <p className="font-medium">Couldn't load today's events</p>
-        <p className="mt-1 text-sm text-ink-muted">{state.message}</p>
-        <button type="button" className={`${secondaryButtonClass} mt-4`} onClick={reload}>
-          Try again
-        </button>
-      </div>
-    )
-  }
-
-  const { events } = state
-  const timed = events.filter((e) => !e.all_day)
-  const next = timed.find((e) => new Date(e.end_at!) > now)
+  const events = state.status === 'ready' ? state.events : []
+  const next = events.filter((e) => !e.all_day).find((e) => new Date(e.end_at!) > now)
 
   const timeRange = (e: EventRow) =>
     e.all_day ? 'All day' : `${format(new Date(e.start_at!), timeFormat)} – ${format(new Date(e.end_at!), timeFormat)}`
 
+  const eventsStatus =
+    state.status === 'loading' ? (
+      <p className="px-5 py-6 text-sm text-ink-muted">Loading…</p>
+    ) : state.status === 'error' ? (
+      <LoadError message={state.message} onRetry={reload} />
+    ) : null
+
+  const allTasks = tasksState.status === 'ready' ? tasksState.tasks : []
+  const overdueTasks = tasksForView(allTasks, 'overdue', now)
+  const todayTasks = tasksForView(allTasks, 'today', now)
+  // Tasks finished today, so ticking one off doesn't make it vanish.
+  const doneToday = tasksForView(allTasks, 'completed', now).filter(
+    (t) => t.completed_at && toDateString(new Date(t.completed_at)) === toDateString(now),
+  )
+  const taskRow = (t: Task) => (
+    <li key={`${t.id}:${t.status}`}>
+      <TaskItem task={t} now={now} onOpen={(task) => setTaskDialog({ task })} onError={setTaskError} />
+    </li>
+  )
+
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       {sections.next_event && (
-        <section aria-labelledby="next-event" className="rounded-2xl border border-line bg-surface p-5">
-          <h2 id="next-event" className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
-            {next && new Date(next.start_at!) <= now ? 'Happening now' : 'Next up'}
-          </h2>
-          {next ? (
-            <button type="button" onClick={() => setEditing(next)} className="mt-2 block w-full text-left">
-              <p className="text-lg font-semibold">{next.title}</p>
-              <p className="mt-1 text-sm text-ink-muted">
-                {timeRange(next)}
-                {next.location && ` · ${next.location}`}
-              </p>
-              <p className="mt-3 inline-flex rounded-full bg-warm-peach/30 px-3 py-1 text-sm font-medium">
-                {new Date(next.start_at!) <= now
-                  ? `Ends in ${formatDistanceStrict(new Date(next.end_at!), now)}`
-                  : `Starts in ${formatDistanceStrict(new Date(next.start_at!), now)}`}
-              </p>
-            </button>
-          ) : (
-            <p className="mt-2 text-ink-muted">Nothing else scheduled today.</p>
+        <section aria-labelledby="next-event" className="rounded-2xl border border-line bg-surface">
+          {eventsStatus ?? (
+            <div className="p-5">
+              <h2 id="next-event" className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
+                {next && new Date(next.start_at!) <= now ? 'Happening now' : 'Next up'}
+              </h2>
+              {next ? (
+                <button type="button" onClick={() => setEditing(next)} className="mt-2 block w-full text-left">
+                  <p className="text-lg font-semibold">{next.title}</p>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    {timeRange(next)}
+                    {next.location && ` · ${next.location}`}
+                  </p>
+                  <p className="mt-3 inline-flex rounded-full bg-warm-peach/30 px-3 py-1 text-sm font-medium">
+                    {new Date(next.start_at!) <= now
+                      ? `Ends in ${formatDistanceStrict(new Date(next.end_at!), now)}`
+                      : `Starts in ${formatDistanceStrict(new Date(next.start_at!), now)}`}
+                  </p>
+                </button>
+              ) : (
+                <p className="mt-2 text-ink-muted">Nothing else scheduled today.</p>
+              )}
+            </div>
           )}
         </section>
+      )}
+
+      {sections.tasks && (
+        <Card
+          id="today-tasks"
+          title="Tasks"
+          action={
+            <Link to="/tasks" className="text-sm font-medium text-ink-muted underline-offset-4 hover:underline">
+              All tasks
+            </Link>
+          }
+        >
+          {taskError && (
+            <p role="alert" className="border-b border-line bg-warm-peach/25 px-5 py-2 text-sm">
+              {taskError}
+            </p>
+          )}
+          {tasksState.status === 'loading' && <p className="px-5 py-6 text-sm text-ink-muted">Loading…</p>}
+          {tasksState.status === 'error' && <LoadError message={tasksState.message} onRetry={reloadTasks} />}
+          {tasksState.status === 'ready' && (
+            <>
+              {overdueTasks.length > 0 && (
+                <>
+                  <h3 className="border-b border-line bg-canvas/60 px-5 py-2 text-xs font-semibold tracking-wide text-danger uppercase">
+                    Overdue
+                  </h3>
+                  <ul className="divide-y divide-line border-b border-line">{overdueTasks.map(taskRow)}</ul>
+                </>
+              )}
+              {overdueTasks.length > 0 && todayTasks.length > 0 && (
+                <h3 className="border-b border-line bg-canvas/60 px-5 py-2 text-xs font-semibold tracking-wide text-ink-muted uppercase">
+                  Due today
+                </h3>
+              )}
+              {todayTasks.length > 0 && (
+                <ul className="divide-y divide-line border-b border-line">{todayTasks.map(taskRow)}</ul>
+              )}
+              {overdueTasks.length === 0 && todayTasks.length === 0 && (
+                <p className="border-b border-line px-5 py-6 text-center text-sm text-ink-muted">
+                  {doneToday.length > 0 ? "Everything due today is done." : 'Nothing due today.'}
+                </p>
+              )}
+              {doneToday.length > 0 && (
+                <ul className="divide-y divide-line border-b border-line">{doneToday.map(taskRow)}</ul>
+              )}
+              <button
+                type="button"
+                onClick={() => setTaskDialog({})}
+                className="flex min-h-12 w-full items-center gap-2 rounded-b-2xl px-5 text-sm font-medium text-ink-muted hover:bg-canvas hover:text-ink"
+              >
+                <PlusIcon className="size-5" />
+                Add a task for today
+              </button>
+            </>
+          )}
+        </Card>
       )}
 
       {sections.timeline && (
-        <section aria-labelledby="today-schedule" className="rounded-2xl border border-line bg-surface">
-          <header className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
-            <h2 id="today-schedule" className="text-base font-semibold">
-              Today's schedule
-            </h2>
+        <Card
+          id="today-schedule"
+          title="Today's schedule"
+          action={
             <Link to="/calendar" className="text-sm font-medium text-ink-muted underline-offset-4 hover:underline">
               Open calendar
             </Link>
-          </header>
-          {events.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-ink-muted">Nothing scheduled today.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {events.map((e) => {
-                const past = !e.all_day && new Date(e.end_at!) <= now
-                const category = e.category_id ? nameByCategory.get(e.category_id) : undefined
-                return (
-                  <li key={e.id}>
-                    <button
-                      type="button"
-                      onClick={() => setEditing(e)}
-                      className={`flex min-h-14 w-full items-center gap-4 px-5 py-3 text-left hover:bg-canvas ${
-                        past ? 'text-ink-muted' : ''
-                      }`}
-                    >
-                      <span className="w-32 shrink-0 text-sm tabular-nums sm:w-36">{timeRange(e)}</span>
-                      <span
-                        className="h-8 w-1 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: (e.category_id && colorByCategory.get(e.category_id)) || UNCATEGORIZED_COLOR,
-                        }}
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate font-medium ${past ? 'line-through decoration-ink/30' : ''}`}>
-                          {e.title}
-                        </span>
-                        {(category || e.location) && (
-                          <span className="block truncate text-sm text-ink-muted">
-                            {[category, e.location].filter(Boolean).join(' · ')}
+          }
+        >
+          {eventsStatus ??
+            (events.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-ink-muted">Nothing scheduled today.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {events.map((e) => {
+                  const past = !e.all_day && new Date(e.end_at!) <= now
+                  const category = e.category_id ? nameByCategory.get(e.category_id) : undefined
+                  return (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(e)}
+                        className={`flex min-h-14 w-full items-center gap-4 px-5 py-3 text-left hover:bg-canvas ${
+                          past ? 'text-ink-muted' : ''
+                        }`}
+                      >
+                        <span className="w-32 shrink-0 text-sm tabular-nums sm:w-36">{timeRange(e)}</span>
+                        <span
+                          className="h-8 w-1 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor:
+                              (e.category_id && colorByCategory.get(e.category_id)) || UNCATEGORIZED_COLOR,
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className={`block truncate font-medium ${past ? 'line-through decoration-ink/30' : ''}`}>
+                            {e.title}
                           </span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
+                          {(category || e.location) && (
+                            <span className="block truncate text-sm text-ink-muted">
+                              {[category, e.location].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ))}
+        </Card>
       )}
 
       {editing && <EventDialog event={editing} onClose={() => setEditing(null)} />}
+      {taskDialog && (
+        <TaskDialog
+          {...(taskDialog.task ? { task: taskDialog.task } : { defaultDueDate: toDateString(now) })}
+          onClose={() => setTaskDialog(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function Card({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="rounded-2xl border border-line bg-surface">
+      <header className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
+        <h2 id={id} className="text-base font-semibold">
+          {title}
+        </h2>
+        {action}
+      </header>
+      {children}
+    </section>
+  )
+}
+
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="px-5 py-6">
+      <p className="font-medium">Couldn't load this</p>
+      <p className="mt-1 text-sm text-ink-muted">{message}</p>
+      <button type="button" className={`${secondaryButtonClass} mt-4`} onClick={onRetry}>
+        Try again
+      </button>
     </div>
   )
 }
