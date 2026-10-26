@@ -33,6 +33,8 @@ export type Occurrence = {
   description: string | null
   location: string | null
   category_id: string | null
+  /** Set when the event is a time block for a task (README §4.3). */
+  task?: { id: string; status: string } | null
 }
 
 const DAY_MS = 86_400_000

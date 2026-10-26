@@ -1,9 +1,13 @@
 import { supabase } from '../../lib/supabase'
 import type { Tables, TablesInsert, TablesUpdate } from '../../types/database'
+import { notifyChange as notifyEventChange, type EventRow } from '../events/api'
+import { timingToColumns, type EventTiming } from '../events/timing'
 
 export type SubtaskRow = Tables<'task_subtasks'>
 export type TaskRow = Tables<'tasks'>
-export type Task = TaskRow & { task_subtasks: SubtaskRow[] }
+/** A calendar event scheduled for working on a task (README §4.3). */
+export type TimeBlock = Pick<EventRow, 'id' | 'all_day' | 'start_at' | 'end_at' | 'start_date' | 'end_date' | 'rrule'>
+export type Task = TaskRow & { task_subtasks: SubtaskRow[]; events: TimeBlock[] }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed'
 export type TaskPriority = 'low' | 'medium' | 'high'
@@ -20,19 +24,21 @@ function notifyChange() {
 
 /** Every open task, plus the most recently completed ones. */
 export async function fetchTasks(): Promise<Task[]> {
-  const select = '*, task_subtasks(*)'
+  const select = '*, task_subtasks(*), events(id, all_day, start_at, end_at, start_date, end_date, rrule)'
   const [open, completed] = await Promise.all([
     supabase
       .from('tasks')
       .select(select)
       .neq('status', 'completed')
-      .order('position', { referencedTable: 'task_subtasks' }),
+      .order('position', { referencedTable: 'task_subtasks' })
+      .order('start_at', { referencedTable: 'events' }),
     supabase
       .from('tasks')
       .select(select)
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .order('position', { referencedTable: 'task_subtasks' })
+      .order('start_at', { referencedTable: 'events' })
       .limit(COMPLETED_LIMIT),
   ])
   const error = open.error ?? completed.error
@@ -70,6 +76,12 @@ export async function updateTask(task: Task, values: TablesUpdate<'tasks'>, subt
   const { error } = await supabase.from('tasks').update(values).eq('id', task.id)
   if (error) throw error
   if (subtasks) await syncSubtasks(task, subtasks)
+  // Time blocks carry the task's title on the calendar.
+  if (values.title && values.title !== task.title && task.events.length > 0) {
+    const { error: blockError } = await supabase.from('events').update({ title: values.title }).eq('task_id', task.id)
+    if (blockError) throw blockError
+    notifyEventChange()
+  }
   notifyChange()
 }
 
@@ -112,6 +124,40 @@ export async function setTaskStatus(id: string, status: TaskStatus) {
   const { error } = await supabase.from('tasks').update(statusColumns(status)).eq('id', id)
   if (error) throw error
   notifyChange()
+  // Time blocks on the calendar show the task's completion state.
+  notifyEventChange()
+}
+
+/** Adds a time block: an event linked to the task, with its title and category. */
+export async function scheduleTask(
+  task: Pick<TaskRow, 'id' | 'user_id' | 'title' | 'category_id'>,
+  timing: EventTiming,
+  timezone: string,
+): Promise<TimeBlock> {
+  const { data, error } = await supabase
+    .from('events')
+    .insert({
+      user_id: task.user_id,
+      task_id: task.id,
+      title: task.title,
+      category_id: task.category_id,
+      timezone,
+      ...timingToColumns(timing),
+    })
+    .select('id, all_day, start_at, end_at, start_date, end_date, rrule')
+    .single()
+  if (error) throw error
+  notifyChange()
+  notifyEventChange()
+  return data
+}
+
+/** Deletes a time block; the task stays (README §4.3). */
+export async function removeTimeBlock(id: string) {
+  const { error } = await supabase.from('events').delete().eq('id', id)
+  if (error) throw error
+  notifyChange()
+  notifyEventChange()
 }
 
 export async function setSubtaskCompleted(id: string, isCompleted: boolean) {
@@ -120,9 +166,10 @@ export async function setSubtaskCompleted(id: string, isCompleted: boolean) {
   notifyChange()
 }
 
-/** Subtasks go with it; calendar time blocks stay, unlinked (README §4.3). */
+/** Subtasks go with it; calendar time blocks stay, unlinked. */
 export async function deleteTask(id: string) {
   const { error } = await supabase.from('tasks').delete().eq('id', id)
   if (error) throw error
   notifyChange()
+  notifyEventChange()
 }

@@ -19,6 +19,7 @@ import { parseRule, type RepeatConfig } from '../recurrence/rule'
 import { ScopeChooser } from '../recurrence/ScopeChooser'
 import type { EditScope } from '../recurrence/scopes'
 import { notificationPrefs } from '../settings/prefs'
+import { setTaskStatus } from '../tasks/api'
 import { createEvent } from './api'
 import { defaultTiming, type EventTiming } from './timing'
 
@@ -91,6 +92,7 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [step, setStep] = useState<Step>({ kind: 'form' })
   const [overlaps, setOverlaps] = useState<string[]>([])
+  const [taskDone, setTaskDone] = useState(occurrence?.task?.status === 'completed')
 
   const isRecurring = !!occurrence?.original
   const repeatChanged = JSON.stringify(form.repeat) !== JSON.stringify(initial.repeat)
@@ -115,6 +117,18 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
   }, [current.allDay, startMs, endMs, occurrence?.key])
 
   const visibleOverlaps = current.allDay || !(endMs > startMs) ? [] : overlaps
+
+  // Saves straight away, like ticking the task off anywhere else.
+  async function toggleTask(done: boolean) {
+    if (!occurrence?.task) return
+    setTaskDone(done)
+    try {
+      await setTaskStatus(occurrence.task.id, done ? 'completed' : 'pending')
+    } catch (err) {
+      setTaskDone(!done)
+      setSaveError(err instanceof Error ? err.message : 'Could not update the task.')
+    }
+  }
 
   function update(patch: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...patch }))
@@ -269,6 +283,23 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
               </p>
             )}
           </div>
+
+          {occurrence?.task && (
+            <label className="flex min-h-11 items-center gap-3 rounded-xl bg-canvas px-3 py-2">
+              <input
+                type="checkbox"
+                className="size-5 accent-ink"
+                checked={taskDone}
+                onChange={(e) => void toggleTask(e.target.checked)}
+              />
+              <span>
+                <span className="block font-medium">Task done</span>
+                <span className="block text-sm text-ink-muted">
+                  This is time blocked for a task. Deleting the block keeps the task.
+                </span>
+              </span>
+            </label>
+          )}
 
           <label className="flex min-h-11 items-center gap-3">
             <input

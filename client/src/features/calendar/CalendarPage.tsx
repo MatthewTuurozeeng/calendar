@@ -3,6 +3,7 @@ import type {
   DatesSetArg,
   EventChangeArg,
   EventClickArg,
+  EventContentArg,
   EventInput,
   EventSourceFuncArg,
 } from '@fullcalendar/core'
@@ -15,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUserData } from '../auth/user-data'
 import { calendarPrefs, type CalendarPrefs } from '../settings/prefs'
 import { Dialog } from '../../components/ui/Dialog'
+import { CheckIcon } from '../../components/ui/icons'
 import { toDateString } from '../../lib/dates'
 import { eventChanges } from '../events/api'
 import { EventDialog } from '../events/EventDialog'
@@ -24,6 +26,7 @@ import type { Occurrence } from '../recurrence/expand'
 import { parseRule } from '../recurrence/rule'
 import { ScopeChooser } from '../recurrence/ScopeChooser'
 import type { EditScope } from '../recurrence/scopes'
+import { setTaskStatus, taskChanges } from '../tasks/api'
 import { CalendarToolbar, type CalendarView } from './CalendarToolbar'
 
 const UNCATEGORIZED_COLOR = '#E7E2E0'
@@ -88,7 +91,11 @@ export function CalendarPage() {
   useEffect(() => {
     const refetch = () => calendarRef.current?.getApi().refetchEvents()
     eventChanges.addEventListener('change', refetch)
-    return () => eventChanges.removeEventListener('change', refetch)
+    taskChanges.addEventListener('change', refetch)
+    return () => {
+      eventChanges.removeEventListener('change', refetch)
+      taskChanges.removeEventListener('change', refetch)
+    }
   }, [])
 
   function handleDatesSet(arg: DatesSetArg) {
@@ -103,7 +110,16 @@ export function CalendarPage() {
 
   function handleEventClick(arg: EventClickArg) {
     arg.jsEvent.preventDefault()
-    setDialog({ occurrence: arg.event.extendedProps.occurrence as Occurrence })
+    const occurrence = arg.event.extendedProps.occurrence as Occurrence
+    // The checkbox on a task's time block completes or reopens the task (README §4.3).
+    if (occurrence.task && (arg.jsEvent.target as Element).closest('[data-task-toggle]')) {
+      const done = occurrence.task.status === 'completed'
+      setTaskStatus(occurrence.task.id, done ? 'pending' : 'completed').catch((err: unknown) =>
+        setLoadError(err instanceof Error ? err.message : 'Could not update the task.'),
+      )
+      return
+    }
+    setDialog({ occurrence })
   }
 
   // Drag to move, drag the edge to resize. Repeating events ask which occurrences to move.
@@ -178,6 +194,7 @@ export function CalendarPage() {
           select={handleSelect}
           eventClick={handleEventClick}
           eventChange={handleEventChange}
+          eventContent={renderEventContent}
           nowIndicator
           scrollTime={`${String(prefs.day_start_hour).padStart(2, '0')}:00:00`}
           allDayText="All day"
@@ -218,6 +235,34 @@ export function CalendarPage() {
           />
         </Dialog>
       )}
+    </div>
+  )
+}
+
+/** Task time blocks get a completion checkbox; other events render as usual. */
+function renderEventContent(arg: EventContentArg) {
+  const { task } = arg.event.extendedProps.occurrence as Occurrence
+  if (!task) return true
+  const done = task.status === 'completed'
+  return (
+    <div className="flex min-w-0 items-start gap-1 overflow-hidden">
+      {/* Clicks are handled in eventClick; this span only marks the target. */}
+      <span
+        data-task-toggle
+        role="checkbox"
+        aria-checked={done}
+        aria-label={done ? 'Reopen task' : 'Complete task'}
+        title={done ? 'Reopen task' : 'Complete task'}
+        className="-m-0.5 shrink-0 p-0.5"
+      >
+        <span className="mt-px grid size-3.5 place-items-center rounded-full border border-ink/70 bg-surface/80">
+          {done && <CheckIcon className="size-2.5" strokeWidth={3} />}
+        </span>
+      </span>
+      <span className="min-w-0">
+        {arg.timeText && <span className="mr-1 text-[0.7rem] opacity-80">{arg.timeText}</span>}
+        <span className={done ? 'line-through opacity-70' : ''}>{arg.event.title}</span>
+      </span>
     </div>
   )
 }

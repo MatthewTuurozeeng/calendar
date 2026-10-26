@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  blockLabel,
   compareTasks,
   countByView,
   dayLabel,
   defaultDueDate,
   dueLabel,
   groupByDueDay,
+  suggestBlock,
   taskView,
   tasksForView,
   taskViewFromParams,
+  upcomingBlocks,
 } from '../../src/features/tasks/views'
 
 // Monday 26 October 2026, 14:00 local time
@@ -130,5 +133,48 @@ describe('view helpers', () => {
     expect(taskViewFromParams(new URLSearchParams('view=overdue'))).toBe('overdue')
     expect(taskViewFromParams(new URLSearchParams('view=nonsense'))).toBe('today')
     expect(taskViewFromParams(new URLSearchParams())).toBe('today')
+  })
+})
+
+describe('time blocks', () => {
+  const block = (start: Date, end: Date) => ({
+    id: 'b',
+    all_day: false,
+    start_at: start.toISOString(),
+    end_at: end.toISOString(),
+    start_date: null,
+    end_date: null,
+    rrule: null,
+  })
+
+  it('suggests the next full hour, lasting the estimate', () => {
+    const timing = suggestBlock({ due_at: null, due_date: null, estimated_minutes: 45 }, now, 60)
+    expect(timing.start).toEqual(new Date(2026, 9, 26, 15))
+    expect(timing.end).toEqual(new Date(2026, 9, 26, 15, 45))
+  })
+
+  it('suggests the due day at 09:00 when the task is due later', () => {
+    const timing = suggestBlock({ due_at: null, due_date: '2026-10-29', estimated_minutes: null }, now, 30)
+    expect(timing.start).toEqual(new Date(2026, 9, 29, 9))
+    expect(timing.end).toEqual(new Date(2026, 9, 29, 9, 30))
+  })
+
+  it('suggests tomorrow morning late in the evening', () => {
+    const late = new Date(2026, 9, 26, 22, 10)
+    const timing = suggestBlock({ due_at: null, due_date: null, estimated_minutes: null }, late, 60)
+    expect(timing.start).toEqual(new Date(2026, 9, 27, 9))
+  })
+
+  it('lists blocks that have not finished, soonest first', () => {
+    const past = block(new Date(2026, 9, 26, 9), new Date(2026, 9, 26, 10))
+    const later = { ...block(new Date(2026, 9, 28, 9), new Date(2026, 9, 28, 10)), id: 'later' }
+    const soon = { ...block(new Date(2026, 9, 26, 16), new Date(2026, 9, 26, 17)), id: 'soon' }
+    expect(upcomingBlocks([past, later, soon], now).map((b) => b.id)).toEqual(['soon', 'later'])
+  })
+
+  it('labels a block with its day and times', () => {
+    const b = block(new Date(2026, 9, 27, 15), new Date(2026, 9, 27, 16, 30))
+    expect(blockLabel(b, now)).toBe('Tomorrow, 3:00 PM – 4:30 PM')
+    expect(blockLabel(b, now, 'HH:mm')).toBe('Tomorrow, 15:00 – 16:30')
   })
 })

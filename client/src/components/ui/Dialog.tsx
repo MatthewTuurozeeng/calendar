@@ -18,7 +18,8 @@ export function Dialog({ labelledBy, onClose, children }: DialogProps) {
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      // React bubbles a nested dialog's close event up to this one; ignore it.
+      onClose={(e) => e.target === e.currentTarget && onClose()}
       aria-labelledby={labelledBy}
       className="m-auto max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100%-2rem))] overflow-y-auto rounded-2xl border border-line bg-surface p-6 text-ink shadow-xl backdrop:bg-ink/30"
     >
