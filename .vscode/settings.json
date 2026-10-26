@@ -1,0 +1,5 @@
+{
+  // Edge Functions run on Deno; the rest of the repo uses the normal TypeScript server.
+  "deno.enablePaths": ["server/supabase/functions"],
+  "deno.lint": true
+}
