@@ -1,4 +1,4 @@
-import { addDays, addHours, startOfHour } from 'date-fns'
+import { addDays, addHours, addMinutes, startOfHour } from 'date-fns'
 import { parseLocal, toDateString } from '../../lib/dates'
 import type { Tables } from '../../types/database'
 
@@ -35,10 +35,10 @@ export function timingFromRow(row: TimingColumns): EventTiming {
     : { allDay: false, start: new Date(row.start_at!), end: new Date(row.end_at!) }
 }
 
-/** A one-hour slot starting at the next full hour. */
-export function defaultTiming(now = new Date()): EventTiming {
+/** A slot starting at the next full hour, one hour long unless `minutes` says otherwise. */
+export function defaultTiming(now = new Date(), minutes = 60): EventTiming {
   const start = addHours(startOfHour(now), 1)
-  return { allDay: false, start, end: addHours(start, 1) }
+  return { allDay: false, start, end: addMinutes(start, minutes) }
 }
 
 /** Fills in a missing end, which FullCalendar leaves after some drags. */

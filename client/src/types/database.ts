@@ -298,6 +298,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          calendar_prefs: Json
           created_at: string
           dashboard_prefs: Json
           display_name: string | null
@@ -309,6 +310,7 @@ export type Database = {
           week_starts_on: number
         }
         Insert: {
+          calendar_prefs?: Json
           created_at?: string
           dashboard_prefs?: Json
           display_name?: string | null
@@ -320,6 +322,7 @@ export type Database = {
           week_starts_on?: number
         }
         Update: {
+          calendar_prefs?: Json
           created_at?: string
           dashboard_prefs?: Json
           display_name?: string | null

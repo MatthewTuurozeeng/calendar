@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router'
+import { useUserData } from '../../features/auth/user-data'
 import { EventDialog } from '../../features/events/EventDialog'
 import { defaultTiming, type EventTiming } from '../../features/events/timing'
+import { calendarPrefs } from '../../features/settings/prefs'
 import { PlusIcon } from '../ui/icons'
 import { BottomNav } from './BottomNav'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 
 export function AppShell() {
+  const { profile } = useUserData()
   const [quickAdd, setQuickAdd] = useState<EventTiming | null>(null)
-  const openQuickAdd = () => setQuickAdd(defaultTiming())
+  const openQuickAdd = () => setQuickAdd(defaultTiming(new Date(), calendarPrefs(profile).default_event_minutes))
 
   return (
     <div className="flex min-h-dvh">

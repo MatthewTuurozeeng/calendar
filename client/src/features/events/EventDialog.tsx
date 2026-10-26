@@ -12,6 +12,7 @@ import { parseLocal, toDateString, toTimeString } from '../../lib/dates'
 import { validateEvent, type FieldErrors } from '../../lib/validation'
 import { useSession } from '../auth/auth-context'
 import { useUserData } from '../auth/user-data'
+import { notificationPrefs } from '../settings/prefs'
 import { createEvent, deleteEvent, fetchEventsInRange, updateEvent, type EventRow } from './api'
 import { defaultTiming, timingFromRow, timingToColumns, type EventTiming } from './timing'
 
@@ -129,7 +130,13 @@ export function EventDialog({ event, timing, onClose }: EventDialogProps) {
     setSaveError(null)
     try {
       if (event) await updateEvent(event.id, values)
-      else await createEvent({ ...values, user_id: session.user.id, timezone: profile.timezone })
+      else
+        await createEvent({
+          ...values,
+          user_id: session.user.id,
+          timezone: profile.timezone,
+          reminder_offsets: notificationPrefs(profile).default_event_reminders,
+        })
       onClose()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Something went wrong while saving.')
