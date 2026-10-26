@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router'
+import { EventDialog } from '../../features/events/EventDialog'
+import { defaultTiming, type EventTiming } from '../../features/events/timing'
 import { PlusIcon } from '../ui/icons'
 import { BottomNav } from './BottomNav'
 import { Header } from './Header'
-import { QuickAddDialog } from './QuickAddDialog'
 import { Sidebar } from './Sidebar'
 
 export function AppShell() {
-  const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const openQuickAdd = () => setQuickAddOpen(true)
+  const [quickAdd, setQuickAdd] = useState<EventTiming | null>(null)
+  const openQuickAdd = () => setQuickAdd(defaultTiming())
 
   return (
     <div className="flex min-h-dvh">
@@ -27,13 +28,13 @@ export function AppShell() {
       <button
         type="button"
         onClick={openQuickAdd}
-        aria-label="Quick add"
+        aria-label="New event"
         className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] grid size-14 place-items-center rounded-full bg-accent text-ink shadow-lg shadow-ink/15 md:hidden"
       >
         <PlusIcon />
       </button>
 
-      <QuickAddDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
+      {quickAdd && <EventDialog timing={quickAdd} onClose={() => setQuickAdd(null)} />}
     </div>
   )
 }
