@@ -1,18 +1,32 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router'
+import { Outlet, useLocation, useSearchParams } from 'react-router'
+import { useUserData } from '../../features/auth/user-data'
+import { EventDialog } from '../../features/events/EventDialog'
+import { defaultTiming, type EventTiming } from '../../features/events/timing'
+import { calendarPrefs } from '../../features/settings/prefs'
+import { TaskDialog } from '../../features/tasks/TaskDialog'
+import { defaultDueDate, taskViewFromParams } from '../../features/tasks/views'
 import { PlusIcon } from '../ui/icons'
 import { BottomNav } from './BottomNav'
 import { Header } from './Header'
-import { QuickAddDialog } from './QuickAddDialog'
 import { Sidebar } from './Sidebar'
 
 export function AppShell() {
-  const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const openQuickAdd = () => setQuickAddOpen(true)
+  const { profile } = useUserData()
+  const [quickAdd, setQuickAdd] = useState<EventTiming | null>(null)
+  const openQuickAdd = () => setQuickAdd(defaultTiming(new Date(), calendarPrefs(profile).default_event_minutes))
+
+  // New task is due in the list you're looking at: today, tomorrow for Upcoming, else no date.
+  const { pathname } = useLocation()
+  const [params] = useSearchParams()
+  const onTasks = pathname.startsWith('/tasks')
+  const [newTask, setNewTask] = useState<{ dueDate: string | null } | null>(null)
+  const openNewTask = () =>
+    setNewTask({ dueDate: defaultDueDate(onTasks ? taskViewFromParams(params) : 'today', new Date()) })
 
   return (
     <div className="flex min-h-dvh">
-      <Sidebar onQuickAdd={openQuickAdd} />
+      <Sidebar onNewEvent={openQuickAdd} onNewTask={openNewTask} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
@@ -23,17 +37,18 @@ export function AppShell() {
 
       <BottomNav />
 
-      {/* Mobile floating quick-add, sits above the bottom navigation */}
+      {/* Mobile floating quick-add, sits above the bottom navigation; adds a task on the Tasks page */}
       <button
         type="button"
-        onClick={openQuickAdd}
-        aria-label="Quick add"
+        onClick={onTasks ? openNewTask : openQuickAdd}
+        aria-label={onTasks ? 'New task' : 'New event'}
         className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] grid size-14 place-items-center rounded-full bg-accent text-ink shadow-lg shadow-ink/15 md:hidden"
       >
         <PlusIcon />
       </button>
 
-      <QuickAddDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
+      {quickAdd && <EventDialog timing={quickAdd} onClose={() => setQuickAdd(null)} />}
+      {newTask && <TaskDialog defaultDueDate={newTask.dueDate} onClose={() => setNewTask(null)} />}
     </div>
   )
 }
