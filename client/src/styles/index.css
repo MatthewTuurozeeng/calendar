@@ -20,6 +20,7 @@
   --color-rose-pink: #dda6b9;
 
   --color-accent: var(--color-dusty-orange);
+  --color-danger: #a2402f;
 }
 
 @layer base {
@@ -39,4 +40,46 @@
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
+}
+
+/* FullCalendar, themed with the same tokens */
+.calendar-surface .fc {
+  --fc-border-color: var(--color-line);
+  --fc-page-bg-color: var(--color-surface);
+  --fc-neutral-bg-color: var(--color-canvas);
+  --fc-today-bg-color: color-mix(in srgb, var(--color-warm-peach) 14%, transparent);
+  --fc-now-indicator-color: var(--color-dusty-orange);
+  --fc-highlight-color: color-mix(in srgb, var(--color-periwinkle) 30%, transparent);
+  --fc-list-event-hover-bg-color: var(--color-canvas);
+  font-size: 0.875rem;
+}
+
+.calendar-surface .fc-event {
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.calendar-surface .fc-col-header-cell-cushion,
+.calendar-surface .fc-daygrid-day-number,
+.calendar-surface .fc-list-day-text,
+.calendar-surface .fc-list-day-side-text {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.calendar-surface .fc-day-past .fc-daygrid-day-number,
+.calendar-surface .fc-timegrid-slot-label-cushion {
+  color: var(--color-ink-muted);
+}
+
+.calendar-surface .fc-scrollgrid {
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+/* A small repeat mark on recurring events, so color isn't the only cue */
+.calendar-surface .is-recurring .fc-event-title::after {
+  content: ' ↻';
+  opacity: 0.6;
 }

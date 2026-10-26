@@ -155,10 +155,13 @@ export type Database = {
           event_id: string
           id: string
           is_cancelled: boolean
+          new_category_id: string | null
           new_description: string | null
           new_end_at: string | null
+          new_end_date: string | null
           new_location: string | null
           new_start_at: string | null
+          new_start_date: string | null
           new_title: string | null
           original_date: string | null
           original_start: string | null
@@ -170,10 +173,13 @@ export type Database = {
           event_id: string
           id?: string
           is_cancelled?: boolean
+          new_category_id?: string | null
           new_description?: string | null
           new_end_at?: string | null
+          new_end_date?: string | null
           new_location?: string | null
           new_start_at?: string | null
+          new_start_date?: string | null
           new_title?: string | null
           original_date?: string | null
           original_start?: string | null
@@ -185,10 +191,13 @@ export type Database = {
           event_id?: string
           id?: string
           is_cancelled?: boolean
+          new_category_id?: string | null
           new_description?: string | null
           new_end_at?: string | null
+          new_end_date?: string | null
           new_location?: string | null
           new_start_at?: string | null
+          new_start_date?: string | null
           new_title?: string | null
           original_date?: string | null
           original_start?: string | null
@@ -201,6 +210,13 @@ export type Database = {
             columns: ["user_id", "event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "event_exceptions_new_category_fkey"
+            columns: ["user_id", "new_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["user_id", "id"]
           },
         ]
@@ -298,6 +314,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          calendar_prefs: Json
           created_at: string
           dashboard_prefs: Json
           display_name: string | null
@@ -309,6 +326,7 @@ export type Database = {
           week_starts_on: number
         }
         Insert: {
+          calendar_prefs?: Json
           created_at?: string
           dashboard_prefs?: Json
           display_name?: string | null
@@ -320,6 +338,7 @@ export type Database = {
           week_starts_on?: number
         }
         Update: {
+          calendar_prefs?: Json
           created_at?: string
           dashboard_prefs?: Json
           display_name?: string | null
