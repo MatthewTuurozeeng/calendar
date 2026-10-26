@@ -9,7 +9,7 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed'
 export type TaskPriority = 'low' | 'medium' | 'high'
 
 /** How many completed tasks to load; older ones stay in the database. */
-const COMPLETED_LIMIT = 100
+const COMPLETED_LIMIT = 20
 
 /** Fires 'change' after any task write, so open views can refetch. */
 export const taskChanges = new EventTarget()

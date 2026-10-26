@@ -77,3 +77,9 @@
   border-radius: 0.75rem;
   overflow: hidden;
 }
+
+/* A small repeat mark on recurring events, so color isn't the only cue */
+.calendar-surface .is-recurring .fc-event-title::after {
+  content: ' ↻';
+  opacity: 0.6;
+}

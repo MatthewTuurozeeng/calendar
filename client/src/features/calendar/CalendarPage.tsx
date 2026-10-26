@@ -14,15 +14,25 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUserData } from '../auth/user-data'
 import { calendarPrefs, type CalendarPrefs } from '../settings/prefs'
-import { eventChanges, fetchEventsInRange, updateEvent, type EventRow } from '../events/api'
+import { Dialog } from '../../components/ui/Dialog'
+import { toDateString } from '../../lib/dates'
+import { eventChanges } from '../events/api'
 import { EventDialog } from '../events/EventDialog'
-import { timingToColumns, withDefaultEnd, type EventTiming } from '../events/timing'
+import { withDefaultEnd, type EventTiming } from '../events/timing'
+import { fetchOccurrences, saveOccurrence } from '../recurrence/api'
+import type { Occurrence } from '../recurrence/expand'
+import { parseRule } from '../recurrence/rule'
+import { ScopeChooser } from '../recurrence/ScopeChooser'
+import type { EditScope } from '../recurrence/scopes'
 import { CalendarToolbar, type CalendarView } from './CalendarToolbar'
 
 const UNCATEGORIZED_COLOR = '#E7E2E0'
 const INK = '#29272A'
 
-type DialogState = { event: EventRow } | { timing: EventTiming } | null
+type DialogState = { occurrence: Occurrence } | { timing: EventTiming } | null
+
+/** A drag of a repeating event, waiting for "this / following / all". */
+type PendingMove = { occurrence: Occurrence; timing: EventTiming; revert: () => void }
 
 function initialView(preferred: CalendarPrefs['default_view']): CalendarView {
   if (preferred !== 'auto') return preferred
@@ -39,6 +49,8 @@ export function CalendarPage() {
   const [view, setView] = useState<CalendarView>(() => initialView(prefs.default_view))
   const [loadError, setLoadError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState>(null)
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  const [moving, setMoving] = useState(false)
 
   // Includes archived categories, so past events keep their color.
   const colorByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.color])), [allCategories])
@@ -46,20 +58,22 @@ export function CalendarPage() {
   const loadEvents = useCallback(
     async (range: EventSourceFuncArg): Promise<EventInput[]> => {
       try {
-        const rows = await fetchEventsInRange(range.start, range.end)
+        const occurrences = await fetchOccurrences(range.start, range.end)
         setLoadError(null)
-        return rows.map((row) => {
-          const color = (row.category_id && colorByCategory.get(row.category_id)) || UNCATEGORIZED_COLOR
+        return occurrences.map((occurrence) => {
+          const { timing, category_id } = occurrence
+          const color = (category_id && colorByCategory.get(category_id)) || UNCATEGORIZED_COLOR
           return {
-            id: row.id,
-            title: row.title,
-            allDay: row.all_day,
-            start: row.all_day ? row.start_date! : row.start_at!,
-            end: row.all_day ? row.end_date! : row.end_at!,
+            id: occurrence.key,
+            title: occurrence.title,
+            allDay: timing.allDay,
+            start: timing.allDay ? toDateString(timing.start) : timing.start,
+            end: timing.allDay ? toDateString(timing.end) : timing.end,
             backgroundColor: color,
             borderColor: color,
             textColor: INK,
-            extendedProps: { row },
+            classNames: occurrence.original ? ['is-recurring'] : [],
+            extendedProps: { occurrence },
           }
         })
       } catch (err) {
@@ -89,18 +103,41 @@ export function CalendarPage() {
 
   function handleEventClick(arg: EventClickArg) {
     arg.jsEvent.preventDefault()
-    setDialog({ event: arg.event.extendedProps.row as EventRow })
+    setDialog({ occurrence: arg.event.extendedProps.occurrence as Occurrence })
   }
 
-  // Drag to move, drag the edge to resize.
-  async function handleEventChange(arg: EventChangeArg) {
+  // Drag to move, drag the edge to resize. Repeating events ask which occurrences to move.
+  function handleEventChange(arg: EventChangeArg) {
     const { event } = arg
     if (!event.start) return arg.revert()
+    const occurrence = event.extendedProps.occurrence as Occurrence
+    const timing = withDefaultEnd(event.allDay, event.start, event.end)
+    if (occurrence.original) setPendingMove({ occurrence, timing, revert: arg.revert })
+    else void move({ occurrence, timing, revert: arg.revert }, 'all')
+  }
+
+  async function move({ occurrence, timing, revert }: PendingMove, scope: EditScope) {
+    const { event } = occurrence
+    setMoving(true)
     try {
-      await updateEvent(event.id, timingToColumns(withDefaultEnd(event.allDay, event.start, event.end)))
+      await saveOccurrence(
+        occurrence,
+        scope,
+        {
+          title: occurrence.title,
+          description: occurrence.description,
+          location: occurrence.location,
+          category_id: occurrence.category_id,
+          timing,
+        },
+        event.rrule ? parseRule(event.rrule) : null,
+      )
     } catch (err) {
-      arg.revert()
+      revert()
       setLoadError(err instanceof Error ? err.message : 'Could not move the event.')
+    } finally {
+      setMoving(false)
+      setPendingMove(null)
     }
   }
 
@@ -153,9 +190,33 @@ export function CalendarPage() {
 
       {dialog && (
         <EventDialog
-          {...('event' in dialog ? { event: dialog.event } : { timing: dialog.timing })}
+          {...('occurrence' in dialog ? { occurrence: dialog.occurrence } : { timing: dialog.timing })}
           onClose={() => setDialog(null)}
         />
+      )}
+
+      {pendingMove && (
+        <Dialog
+          labelledBy="move-scope"
+          onClose={() => {
+            if (moving) return
+            pendingMove.revert()
+            setPendingMove(null)
+          }}
+        >
+          <h2 id="move-scope" className="sr-only">
+            Move recurring event
+          </h2>
+          <ScopeChooser
+            action="save"
+            pending={moving}
+            onCancel={() => {
+              pendingMove.revert()
+              setPendingMove(null)
+            }}
+            onChoose={(scope) => void move(pendingMove, scope)}
+          />
+        </Dialog>
       )}
     </div>
   )
