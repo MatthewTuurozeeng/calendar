@@ -1,6 +1,9 @@
 {
   "imports": {
     "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
-    "@supabase/server": "npm:@supabase/server@^1"
+    "@supabase/server": "npm:@supabase/server@^1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@^2",
+    "date-fns-tz": "npm:date-fns-tz@3.2.0",
+    "rrule": "npm:rrule@2.8.1"
   }
 }

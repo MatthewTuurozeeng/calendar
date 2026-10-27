@@ -15,6 +15,7 @@ import { useUserData } from '../auth/user-data'
 import { deleteOccurrence, fetchOccurrences, saveOccurrence, scheduleColumns } from '../recurrence/api'
 import { dateToFloating, toFloating, type Occurrence } from '../recurrence/expand'
 import { RepeatField } from '../recurrence/RepeatField'
+import { ReminderPicker } from '../reminders/ReminderPicker'
 import { parseRule, type RepeatConfig } from '../recurrence/rule'
 import { ScopeChooser } from '../recurrence/ScopeChooser'
 import type { EditScope } from '../recurrence/scopes'
@@ -41,11 +42,12 @@ type FormState = {
   endDate: string
   endTime: string
   repeat: RepeatConfig | null
+  reminders: number[]
 }
 
 type Step = { kind: 'form' } | { kind: 'scope'; action: 'save' | 'delete' } | { kind: 'done'; removed: number }
 
-function initialForm(occurrence: Occurrence | undefined, timing: EventTiming): FormState {
+function initialForm(occurrence: Occurrence | undefined, timing: EventTiming, defaultReminders: number[]): FormState {
   // The form shows the last day of an all-day event; storage keeps an exclusive end.
   const shownEnd = timing.allDay ? addDays(timing.end, -1) : timing.end
   return {
@@ -59,6 +61,7 @@ function initialForm(occurrence: Occurrence | undefined, timing: EventTiming): F
     endDate: toDateString(shownEnd),
     endTime: timing.allDay ? '10:00' : toTimeString(timing.end),
     repeat: occurrence?.event.rrule ? parseRule(occurrence.event.rrule) : null,
+    reminders: occurrence ? occurrence.event.reminder_offsets : defaultReminders,
   }
 }
 
@@ -84,7 +87,13 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
   const { profile, categories } = useUserData()
   const titleId = useId()
   const timeZone = occurrence?.event.timezone ?? profile.timezone
-  const [initial] = useState(() => initialForm(occurrence, occurrence?.timing ?? timing ?? defaultTiming()))
+  const [initial] = useState(() =>
+    initialForm(
+      occurrence,
+      occurrence?.timing ?? timing ?? defaultTiming(),
+      notificationPrefs(profile).default_event_reminders,
+    ),
+  )
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<FieldErrors<'title' | 'start' | 'end' | 'repeat'>>({})
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -163,6 +172,7 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
       location: form.location.trim() || null,
       category_id: form.categoryId || null,
       timing: current,
+      reminder_offsets: form.reminders,
     }
   }
 
@@ -194,14 +204,14 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
     if (Object.keys(found).length > 0) return
 
     if (!occurrence) {
-      const { timing: t, ...content } = values()
+      const { timing: t, reminder_offsets, ...content } = values()
       void run(() =>
         createEvent({
           ...content,
           ...scheduleColumns(t, form.repeat, profile.timezone),
           user_id: session.user.id,
           timezone: profile.timezone,
-          reminder_offsets: notificationPrefs(profile).default_event_reminders,
+          reminder_offsets,
         }).then(() => undefined),
       )
     } else if (isRecurring) {
@@ -224,7 +234,7 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
   if (step.kind === 'done') {
     return (
       <Dialog labelledBy={titleId} onClose={onClose}>
-        <h2 id={titleId} className="text-lg font-semibold">
+        <h2 id={titleId} className="pr-10 text-lg font-semibold">
           Saved
         </h2>
         <p className="mt-3">
@@ -243,7 +253,7 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
 
   return (
     <Dialog labelledBy={titleId} onClose={onClose}>
-      <h2 id={titleId} className="text-lg font-semibold">
+      <h2 id={titleId} className="pr-10 text-lg font-semibold">
         {occurrence ? 'Edit event' : 'New event'}
       </h2>
 
@@ -393,6 +403,19 @@ export function EventDialog({ occurrence, timing, onClose }: EventDialogProps) {
             onChange={(repeat) => update({ repeat })}
             start={repeatStart}
             error={errors.repeat}
+          />
+
+          <ReminderPicker
+            value={form.reminders}
+            onChange={(reminders) => update({ reminders })}
+            hint={
+              [
+                form.allDay ? 'All-day events remind relative to your all-day reminder time in Settings.' : '',
+                isRecurring ? 'Reminders apply to every occurrence, so they don’t change with "This event".' : '',
+              ]
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
           />
 
           <div>

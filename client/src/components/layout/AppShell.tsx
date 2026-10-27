@@ -3,6 +3,7 @@ import { Outlet, useLocation, useSearchParams } from 'react-router'
 import { useUserData } from '../../features/auth/user-data'
 import { EventDialog } from '../../features/events/EventDialog'
 import { defaultTiming, type EventTiming } from '../../features/events/timing'
+import { useReminderSync } from '../../features/reminders/sync'
 import { calendarPrefs } from '../../features/settings/prefs'
 import { TaskDialog } from '../../features/tasks/TaskDialog'
 import { defaultDueDate, taskViewFromParams } from '../../features/tasks/views'
@@ -13,6 +14,7 @@ import { Sidebar } from './Sidebar'
 
 export function AppShell() {
   const { profile } = useUserData()
+  useReminderSync()
   const [quickAdd, setQuickAdd] = useState<EventTiming | null>(null)
   const openQuickAdd = () => setQuickAdd(defaultTiming(new Date(), calendarPrefs(profile).default_event_minutes))
 

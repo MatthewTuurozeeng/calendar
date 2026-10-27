@@ -12,7 +12,8 @@ import { parseLocal, toDateString, toTimeString } from '../../lib/dates'
 import { validateTask, type FieldErrors } from '../../lib/validation'
 import { useSession } from '../auth/auth-context'
 import { useUserData } from '../auth/user-data'
-import { calendarPrefs, formatOffset } from '../settings/prefs'
+import { ReminderPicker } from '../reminders/ReminderPicker'
+import { calendarPrefs } from '../settings/prefs'
 import {
   createTask,
   deleteTask,
@@ -69,8 +70,6 @@ const STATUSES: { value: TaskStatus; label: string }[] = [
   { value: 'in_progress', label: 'In progress' },
   { value: 'completed', label: 'Done' },
 ]
-
-const REMINDER_CHOICES = [0, 15, 60, 1440]
 
 function initialForm(task: Task | undefined, defaultDueDate: string | null | undefined): FormState {
   const dueAt = task?.due_at ? new Date(task.due_at) : null
@@ -136,13 +135,6 @@ export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
     update({ subtasks: form.subtasks.map((s) => (s.key === key ? { ...s, ...patch } : s)) })
   }
 
-  function toggleReminder(minutes: number) {
-    const next = form.reminders.includes(minutes)
-      ? form.reminders.filter((m) => m !== minutes)
-      : [...form.reminders, minutes]
-    update({ reminders: next.sort((a, b) => a - b) })
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const due =
@@ -203,7 +195,7 @@ export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
 
   return (
     <Dialog labelledBy={titleId} onClose={onClose}>
-      <h2 id={titleId} className="text-lg font-semibold">
+      <h2 id={titleId} className="pr-10 text-lg font-semibold">
         {task ? 'Edit task' : 'New task'}
       </h2>
 
@@ -342,32 +334,17 @@ export function TaskDialog({ task, defaultDueDate, onClose }: TaskDialogProps) {
         </div>
 
         {form.dueMode !== 'none' && (
-          <fieldset>
-            <legend className={labelClass}>Reminders</legend>
-            <div className="flex flex-wrap gap-2">
-              {REMINDER_CHOICES.map((minutes) => {
-                const on = form.reminders.includes(minutes)
-                return (
-                  <button
-                    key={minutes}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleReminder(minutes)}
-                    className={`min-h-11 rounded-full border px-3 text-sm ${
-                      on ? 'border-transparent bg-soft-rose/60 font-medium' : 'border-line text-ink-muted hover:bg-canvas'
-                    }`}
-                  >
-                    {minutes === 0 ? 'When due' : `${formatOffset(minutes).replace(/minutes?/, 'min')} before`}
-                  </button>
-                )
-              })}
-            </div>
-            {form.dueMode === 'date' && (
-              <p className="mt-1 text-xs text-ink-muted">
-                Tasks due on a date remind relative to your all-day reminder time in Settings.
-              </p>
-            )}
-          </fieldset>
+          <ReminderPicker
+            value={form.reminders}
+            onChange={(reminders) => update({ reminders })}
+            presets={[0, 15, 60, 1440]}
+            atStartLabel="When due"
+            hint={
+              form.dueMode === 'date'
+                ? 'Tasks due on a date remind relative to your all-day reminder time in Settings.'
+                : undefined
+            }
+          />
         )}
 
         <fieldset>
