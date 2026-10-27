@@ -70,7 +70,7 @@ export function ScheduleTaskDialog({ task, onScheduled, onClose }: ScheduleTaskD
 
   return (
     <Dialog labelledBy={titleId} onClose={onClose}>
-      <h2 id={titleId} className="text-lg font-semibold">
+      <h2 id={titleId} className="pr-10 text-lg font-semibold">
         Schedule task
       </h2>
       <p className="mt-1 text-ink-muted">{task.title}</p>

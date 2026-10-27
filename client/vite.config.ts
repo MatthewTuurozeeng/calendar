@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
@@ -14,5 +15,10 @@ export default defineConfig({
   },
   test: {
     include: ['tests/unit/**/*.test.ts'],
+    // Server code under test (Edge Function helpers) has no node_modules of its own.
+    alias: {
+      rrule: fileURLToPath(new URL('./node_modules/rrule/dist/esm/index.js', import.meta.url)),
+      'date-fns-tz': fileURLToPath(new URL('./node_modules/date-fns-tz/dist/esm/index.js', import.meta.url)),
+    },
   },
 })

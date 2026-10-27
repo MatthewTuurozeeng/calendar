@@ -4,8 +4,10 @@ import { inputClass, secondaryButtonClass } from '../../components/ui/form'
 import { Switch } from '../../components/ui/Switch'
 import { browserTimeZone, timeZoneOptions } from '../../lib/dates'
 import { useUserData } from '../auth/user-data'
+import { requestReminderSync } from '../reminders/sync'
 import { AccountSettings } from './AccountSettings'
 import { CategorySettings } from './CategorySettings'
+import { InstallAppRow, PushNotificationsRow } from './DeviceSettings'
 import {
   DASHBOARD_SECTIONS,
   MODULES,
@@ -58,6 +60,12 @@ export function SettingsPage() {
 
   const save = (patch: Parameters<typeof updateProfile>[0]) => void track(() => updateProfile(patch))
   const saveCalendar = (patch: Partial<CalendarPrefs>) => save({ calendar_prefs: { ...calendar, ...patch } })
+  // The all-day reminder time and time zone move existing reminders, so resync after saving.
+  const saveAndResync = (patch: Parameters<typeof updateProfile>[0]) =>
+    void track(async () => {
+      await updateProfile(patch)
+      requestReminderSync()
+    })
   const saveNotifications = (patch: Partial<NotificationPrefs>) =>
     save({ notification_prefs: { ...notifications, ...patch } })
   const saveDashboard = (patch: Partial<DashboardPrefs>) => save({ dashboard_prefs: { ...dashboard, ...patch } })
@@ -102,15 +110,18 @@ export function SettingsPage() {
           <SettingRow id="display-name" label="Name">
             <DisplayNameInput value={profile.display_name ?? ''} onSave={(name) => save({ display_name: name || null })} />
           </SettingRow>
+          <InstallAppRow />
         </SettingsSection>
 
         <SettingsSection id="date-time" title="Date & time">
           <SettingRow
             id="timezone"
             label="Time zone"
-            description={<TimeZoneHint timezone={profile.timezone} onUseDevice={(tz) => save({ timezone: tz })} />}
+            description={
+              <TimeZoneHint timezone={profile.timezone} onUseDevice={(tz) => saveAndResync({ timezone: tz })} />
+            }
           >
-            <TimeZoneSelect value={profile.timezone} onChange={(tz) => save({ timezone: tz })} />
+            <TimeZoneSelect value={profile.timezone} onChange={(tz) => saveAndResync({ timezone: tz })} />
           </SettingRow>
 
           <SettingRow id="week-start" label="Start of week">
@@ -218,10 +229,11 @@ export function SettingsPage() {
         </SettingsSection>
 
         <SettingsSection id="notifications" title="Notifications">
+          <PushNotificationsRow track={track} />
           <SettingRow
             id="default-reminders"
             label="Default event reminders"
-            description="Added to each new event. Pick any number."
+            description="Added to each new event; change them per event in the event form."
           >
             <div
               id="default-reminders"
@@ -257,7 +269,9 @@ export function SettingsPage() {
             <TimeInput
               id="all-day-reminder-time"
               value={notifications.all_day_reminder_time}
-              onSave={(time) => saveNotifications({ all_day_reminder_time: time })}
+              onSave={(time) =>
+                saveAndResync({ notification_prefs: { ...notifications, all_day_reminder_time: time } })
+              }
             />
           </SettingRow>
         </SettingsSection>

@@ -77,6 +77,7 @@ function contentColumns(values: OccurrenceValues) {
     description: values.description,
     location: values.location,
     category_id: values.category_id,
+    ...(values.reminder_offsets ? { reminder_offsets: values.reminder_offsets } : {}),
   }
 }
 

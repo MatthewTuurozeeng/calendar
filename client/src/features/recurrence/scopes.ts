@@ -22,6 +22,8 @@ export type OccurrenceValues = {
   location: string | null
   category_id: string | null
   timing: EventTiming
+  /** Series-wide; "this event" edits ignore it. Omit to leave reminders unchanged. */
+  reminder_offsets?: number[]
 }
 
 const DAY_MS = 86_400_000

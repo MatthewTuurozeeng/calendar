@@ -508,6 +508,30 @@ calendar/
 
 Keep components, hooks and queries inside their feature folder. Don't add abstraction layers before they're needed.
 
+### Deploying, reminders and install setup
+
+Do these once per Supabase project. Installing on a phone and push both need the HTTPS deployment.
+
+1. **VAPID keys** for Web Push: `npx web-push generate-vapid-keys`. Keep the private key out of the repo.
+2. **Database and functions** (from `server/`):
+   ```bash
+   supabase db push
+   supabase secrets set VAPID_PUBLIC_KEY=<public> VAPID_PRIVATE_KEY=<private> VAPID_SUBJECT=mailto:<your email>
+   supabase functions deploy sync-reminders
+   supabase functions deploy send-reminders
+   ```
+3. **Cron credentials in Vault.** In the dashboard SQL editor, using the secret API key named `default` (Project Settings → API Keys):
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+   select vault.create_secret('<sb_secret_... default key>', 'edge_functions_secret_key');
+   ```
+   The migration already scheduled `send-reminders` every minute and `sync-reminders` hourly; they use these two secrets.
+4. **Frontend on Vercel.** Import the repo with **Root Directory** `client` (Vite preset). Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_VAPID_PUBLIC_KEY`. `client/vercel.json` sends every route to the app.
+5. **Auth URLs.** In Supabase Authentication → URL Configuration, set the Site URL to the Vercel URL and add it to Redirect URLs.
+6. **On the phone.** Open the Vercel URL in Chrome (Android) or Safari (iPhone), sign in, then install: Settings → Install, or Chrome's ⋮ menu → *Add to home screen*. On iPhone use Share → *Add to Home Screen*. Open the installed app, go to Settings → Notifications → *Notifications on this device*, and send a test notification.
+
+To check the pipeline: `select status, last_error, remind_at from reminders order by remind_at desc limit 20;` and the cron history in `cron.job_run_details`.
+
 ## 9. Releases
 
 Each release should be **used daily** before the next one starts.
