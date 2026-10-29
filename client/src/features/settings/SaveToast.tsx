@@ -10,8 +10,8 @@ export function SaveToast({ status, onDismiss }: { status: SaveStatus; onDismiss
       {status && (
         <div
           role={status.kind === 'error' ? 'alert' : 'status'}
-          className={`pointer-events-auto flex min-h-11 max-w-md items-center gap-3 rounded-xl px-4 text-sm font-medium shadow-lg shadow-ink/15 ${
-            status.kind === 'error' ? 'bg-warm-peach text-ink' : 'bg-ink text-surface'
+          className={`pointer-events-auto flex min-h-11 max-w-md items-center gap-3 rounded-xl px-4 text-sm font-medium shadow-lg shadow-black/20 ${
+            status.kind === 'error' ? 'bg-warm-peach text-on-pastel' : 'bg-ink text-surface'
           }`}
         >
           {status.kind === 'saving' && 'Saving…'}

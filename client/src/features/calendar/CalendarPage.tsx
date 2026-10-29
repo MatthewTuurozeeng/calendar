@@ -255,7 +255,7 @@ function renderEventContent(arg: EventContentArg) {
         title={done ? 'Reopen task' : 'Complete task'}
         className="-m-0.5 shrink-0 p-0.5"
       >
-        <span className="mt-px grid size-3.5 place-items-center rounded-full border border-ink/70 bg-surface/80">
+        <span className="mt-px grid size-3.5 place-items-center rounded-full border border-on-pastel/70 bg-white/70">
           {done && <CheckIcon className="size-2.5" strokeWidth={3} />}
         </span>
       </span>

@@ -19,7 +19,7 @@ export function Sidebar({ onNewEvent, onNewTask }: SidebarProps) {
         <button
           type="button"
           onClick={onNewEvent}
-          className="flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 font-medium text-ink"
+          className="flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 font-medium text-on-pastel"
         >
           <PlusIcon className="size-5" />
           New event

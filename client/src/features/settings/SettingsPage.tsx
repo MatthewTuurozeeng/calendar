@@ -7,7 +7,7 @@ import { useUserData } from '../auth/user-data'
 import { requestReminderSync } from '../reminders/sync'
 import { AccountSettings } from './AccountSettings'
 import { CategorySettings } from './CategorySettings'
-import { InstallAppRow, PushNotificationsRow } from './DeviceSettings'
+import { AppearanceRow, InstallAppRow, PushNotificationsRow } from './DeviceSettings'
 import {
   DASHBOARD_SECTIONS,
   MODULES,
@@ -110,6 +110,7 @@ export function SettingsPage() {
           <SettingRow id="display-name" label="Name">
             <DisplayNameInput value={profile.display_name ?? ''} onSave={(name) => save({ display_name: name || null })} />
           </SettingRow>
+          <AppearanceRow />
           <InstallAppRow />
         </SettingsSection>
 

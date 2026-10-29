@@ -115,4 +115,5 @@ export function TaskItem({ task, now, onOpen, onError, hideDue }: TaskItemProps)
       {scheduling && <ScheduleTaskDialog task={task} onClose={() => setScheduling(false)} />}
     </div>
   )
+  
 }

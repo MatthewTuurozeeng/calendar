@@ -8,6 +8,16 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Matthew's Calendar</title>
+    <script>
+      // Theme before first paint, so dark mode never flashes white. Same rules as src/lib/theme.ts.
+      try {
+        var theme = localStorage.getItem('theme')
+      } catch (e) {}
+      if (theme !== 'light' && theme !== 'dark') {
+        theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      }
+      document.documentElement.dataset.theme = theme
+    </script>
   </head>
   <body>
     <div id="root"></div>

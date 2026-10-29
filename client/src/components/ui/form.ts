@@ -4,6 +4,6 @@ export const inputClass =
 export const labelClass = 'mb-1 block text-sm font-medium'
 export const errorClass = 'mt-1 text-sm text-danger'
 export const primaryButtonClass =
-  'inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 font-medium text-ink disabled:opacity-60'
+  'inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 font-medium text-on-pastel disabled:opacity-60'
 export const secondaryButtonClass =
   'inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 font-medium hover:bg-canvas disabled:opacity-60'

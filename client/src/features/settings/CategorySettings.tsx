@@ -264,7 +264,7 @@ function CategoryEditor({ category, onSave, onCancel, onArchive, onDelete }: Cat
                   className="grid size-8 place-items-center rounded-full ring-ink ring-offset-2 peer-checked:ring-2 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-ink"
                   style={{ backgroundColor: c.hex }}
                 >
-                  {selected && <CheckIcon className="size-4 text-ink" />}
+                  {selected && <CheckIcon className="size-4 text-on-pastel" />}
                 </span>
               </label>
             )
