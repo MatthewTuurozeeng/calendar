@@ -19,6 +19,7 @@ import { Dialog } from '../../components/ui/Dialog'
 import { CheckIcon } from '../../components/ui/icons'
 import { toDateString } from '../../lib/dates'
 import { eventChanges } from '../events/api'
+import { useCourseColors } from '../academic/api'
 import { EventDialog } from '../events/EventDialog'
 import { withDefaultEnd, type EventTiming } from '../events/timing'
 import { fetchOccurrences, saveOccurrence } from '../recurrence/api'
@@ -57,6 +58,8 @@ export function CalendarPage() {
 
   // Includes archived categories, so past events keep their color.
   const colorByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.color])), [allCategories])
+  // Classes, quizzes and exams take their course's color (README §4.8).
+  const courseColors = useCourseColors()
 
   const loadEvents = useCallback(
     async (range: EventSourceFuncArg): Promise<EventInput[]> => {
@@ -65,7 +68,11 @@ export function CalendarPage() {
         setLoadError(null)
         return occurrences.map((occurrence) => {
           const { timing, category_id } = occurrence
-          const color = (category_id && colorByCategory.get(category_id)) || UNCATEGORIZED_COLOR
+          const courseId = occurrence.event.course_id
+          const color =
+            (courseId && courseColors.get(courseId)) ||
+            (category_id && colorByCategory.get(category_id)) ||
+            UNCATEGORIZED_COLOR
           return {
             id: occurrence.key,
             title: occurrence.title,
@@ -84,7 +91,7 @@ export function CalendarPage() {
         return []
       }
     },
-    [colorByCategory],
+    [colorByCategory, courseColors],
   )
 
   // Refetch after any event is created, edited or deleted, including from quick-add.

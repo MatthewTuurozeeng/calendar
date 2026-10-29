@@ -8,6 +8,7 @@ import { toDateString } from '../../lib/dates'
 import { useNow } from '../../lib/use-now'
 import { useUserData } from '../auth/user-data'
 import { eventChanges } from '../events/api'
+import { useCourseColors } from '../academic/api'
 import { EventDialog } from '../events/EventDialog'
 import type { EventTiming } from '../events/timing'
 import { fetchOccurrences } from '../recurrence/api'
@@ -46,6 +47,7 @@ export function TodayPage() {
   const dayKey = format(now, 'yyyy-MM-dd')
 
   const colorByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.color])), [allCategories])
+  const courseColors = useCourseColors()
   const nameByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.name])), [allCategories])
 
   const [attempt, setAttempt] = useState(0)
@@ -301,7 +303,9 @@ export function TodayPage() {
                           className="h-8 w-1 shrink-0 rounded-full"
                           style={{
                             backgroundColor:
-                              (e.category_id && colorByCategory.get(e.category_id)) || UNCATEGORIZED_COLOR,
+                              (e.event.course_id && courseColors.get(e.event.course_id)) ||
+                              (e.category_id && colorByCategory.get(e.category_id)) ||
+                              UNCATEGORIZED_COLOR,
                           }}
                           aria-hidden="true"
                         />
