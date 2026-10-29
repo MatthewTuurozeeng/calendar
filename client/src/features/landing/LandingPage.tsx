@@ -206,15 +206,15 @@ export function LandingPage() {
                 <Line>
                   <span className="text-dusty-orange">$</span> npm test
                 </Line>
-                {['prefs', 'recurrence', 'reminder-plan', 'task-views', 'timing', 'validation'].map((name) => (
+                {['prefs', 'recurrence', 'reminder-plan', 'task-views', 'timing', 'today', 'validation'].map((name) => (
                   <Line key={name}>
                     <span className="text-[#8fc79a]">✓</span> tests/unit/{name}.test.ts
                   </Line>
                 ))}
                 <Line>&nbsp;</Line>
                 <Line>
-                  <span className="text-[#a7a2aa]">Tests</span> <span className="text-[#8fc79a]">73 passed</span>
-                  <span className="text-[#a7a2aa]"> (73)</span>
+                  <span className="text-[#a7a2aa]">Tests</span> <span className="text-[#8fc79a]">81 passed</span>
+                  <span className="text-[#a7a2aa]"> (81)</span>
                 </Line>
               </CodeWindow>
             </div>
