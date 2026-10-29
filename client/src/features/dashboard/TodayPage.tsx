@@ -1,4 +1,4 @@
-import { addDays, format, formatDistanceStrict, startOfDay } from 'date-fns'
+import { addDays, addMinutes, format, formatDistanceStrict, roundToNearestMinutes, setHours, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -8,7 +8,9 @@ import { toDateString } from '../../lib/dates'
 import { useNow } from '../../lib/use-now'
 import { useUserData } from '../auth/user-data'
 import { eventChanges } from '../events/api'
+import { useCourseColors } from '../academic/api'
 import { EventDialog } from '../events/EventDialog'
+import type { EventTiming } from '../events/timing'
 import { fetchOccurrences } from '../recurrence/api'
 import type { Occurrence } from '../recurrence/expand'
 import { calendarPrefs, dashboardPrefs } from '../settings/prefs'
@@ -17,8 +19,12 @@ import { TaskDialog } from '../tasks/TaskDialog'
 import { TaskItem } from '../tasks/TaskItem'
 import { useTasks } from '../tasks/use-tasks'
 import { tasksForView } from '../tasks/views'
+import { DailyIntention } from './DailyIntention'
+import { daySummary, formatMinutes, freeGaps } from './today'
 
 const UNCATEGORIZED_COLOR = '#E7E2E0'
+/** Free time is looked for until this hour. */
+const DAY_END_HOUR = 22
 
 type LoadState =
   | { status: 'loading' }
@@ -30,15 +36,18 @@ export function TodayPage() {
   const now = useNow()
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [editing, setEditing] = useState<Occurrence | null>(null)
+  const [newEvent, setNewEvent] = useState<EventTiming | null>(null)
   const { state: tasksState, reload: reloadTasks } = useTasks()
   const [taskDialog, setTaskDialog] = useState<{ task?: Task } | null>(null)
   const [taskError, setTaskError] = useState<string | null>(null)
 
   const sections = dashboardPrefs(profile)
-  const timeFormat = calendarPrefs(profile).time_format === '24h' ? 'HH:mm' : 'h:mm a'
+  const calPrefs = calendarPrefs(profile)
+  const timeFormat = calPrefs.time_format === '24h' ? 'HH:mm' : 'h:mm a'
   const dayKey = format(now, 'yyyy-MM-dd')
 
   const colorByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.color])), [allCategories])
+  const courseColors = useCourseColors()
   const nameByCategory = useMemo(() => new Map(allCategories.map((c) => [c.id, c.name])), [allCategories])
 
   const [attempt, setAttempt] = useState(0)
@@ -64,7 +73,7 @@ export function TodayPage() {
     }
   }, [reload])
 
-  if (!sections.next_event && !sections.timeline && !sections.tasks) {
+  if (!Object.values(sections).some(Boolean)) {
     return (
       <EmptyState
         title="Your Today page is empty"
@@ -99,8 +108,27 @@ export function TodayPage() {
     </li>
   )
 
+  const summary =
+    state.status === 'ready' && tasksState.status === 'ready'
+      ? daySummary(events, { dueToday: todayTasks.length, doneToday: doneToday.length, overdue: overdueTasks.length }, now)
+      : null
+
+  const today = startOfDay(now)
+  const dayStart = setHours(today, calPrefs.day_start_hour)
+  const dayEnd = setHours(today, Math.max(DAY_END_HOUR, calPrefs.day_start_hour + 1))
+  const gaps = freeGaps(events, dayStart, dayEnd, now)
+
+  function planGap(start: Date, end: Date) {
+    // Start on a quarter hour, at the default event length if the gap allows.
+    const from = roundToNearestMinutes(start, { nearestTo: 15, roundingMethod: 'ceil' })
+    const to = addMinutes(from, calPrefs.default_event_minutes)
+    setNewEvent({ allDay: false, start: from, end: to < end ? to : end })
+  }
+
   return (
     <div className="flex max-w-3xl flex-col gap-6">
+      {sections.intention && <DailyIntention key={dayKey} date={dayKey} />}
+
       {sections.next_event && (
         <section aria-labelledby="next-event" className="rounded-2xl border border-line bg-surface">
           {eventsStatus ?? (
@@ -125,6 +153,64 @@ export function TodayPage() {
                 <p className="mt-2 text-ink-muted">Nothing else scheduled today.</p>
               )}
             </div>
+          )}
+        </section>
+      )}
+
+      {sections.summary && (
+        <section aria-labelledby="summary" className="rounded-2xl border border-line bg-surface p-5">
+          <h2 id="summary" className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
+            Today so far
+          </h2>
+          {!summary ? (
+            state.status === 'error' || tasksState.status === 'error' ? (
+              <p className="mt-2 text-sm text-ink-muted">Couldn't load today's progress.</p>
+            ) : (
+              <p className="mt-2 text-sm text-ink-muted">Loading…</p>
+            )
+          ) : (
+            <>
+              <dl className="mt-3 grid grid-cols-3 gap-4">
+                <Stat
+                  label="Tasks"
+                  value={summary.tasksPlanned === 0 ? '–' : `${summary.tasksDone}/${summary.tasksPlanned}`}
+                  detail={summary.overdue > 0 ? `${summary.overdue} overdue` : undefined}
+                  danger={summary.overdue > 0}
+                />
+                <Stat
+                  label="Events"
+                  value={summary.eventsPlanned === 0 ? '–' : `${summary.eventsDone}/${summary.eventsPlanned}`}
+                  detail={summary.eventsPlanned > 0 ? 'finished' : undefined}
+                />
+                <Stat
+                  label="Focus time"
+                  value={summary.focusMinutes === 0 ? '–' : formatMinutes(summary.focusMinutes)}
+                  detail={summary.focusMinutes > 0 ? 'blocked for tasks' : undefined}
+                />
+              </dl>
+              {summary.tasksPlanned > 0 && (
+                <div className="mt-4">
+                  <div
+                    role="progressbar"
+                    aria-label="Tasks done today"
+                    aria-valuemin={0}
+                    aria-valuemax={summary.tasksPlanned}
+                    aria-valuenow={summary.tasksDone}
+                    className="h-2 overflow-hidden rounded-full bg-canvas"
+                  >
+                    <div
+                      className="h-full rounded-full bg-dusty-orange transition-[width] duration-500"
+                      style={{ width: `${(summary.tasksDone / summary.tasksPlanned) * 100}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-ink-muted">
+                    {summary.tasksDone === summary.tasksPlanned
+                      ? "All of today's tasks are done. Nice work."
+                      : `${summary.tasksPlanned - summary.tasksDone} task${summary.tasksPlanned - summary.tasksDone === 1 ? '' : 's'} left for today.`}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
@@ -217,7 +303,9 @@ export function TodayPage() {
                           className="h-8 w-1 shrink-0 rounded-full"
                           style={{
                             backgroundColor:
-                              (e.category_id && colorByCategory.get(e.category_id)) || UNCATEGORIZED_COLOR,
+                              (e.event.course_id && courseColors.get(e.event.course_id)) ||
+                              (e.category_id && colorByCategory.get(e.category_id)) ||
+                              UNCATEGORIZED_COLOR,
                           }}
                           aria-hidden="true"
                         />
@@ -250,7 +338,41 @@ export function TodayPage() {
         </Card>
       )}
 
+      {sections.free_gaps && (
+        <Card id="free-time" title="Free time">
+          {eventsStatus ??
+            (gaps.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-ink-muted">
+                {now >= dayEnd ? 'The day is done.' : 'No free stretches of 30 minutes or more left today.'}
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {gaps.map((g) => (
+                  <li key={g.start.getTime()}>
+                    <button
+                      type="button"
+                      onClick={() => planGap(g.start, g.end)}
+                      className="group flex min-h-14 w-full items-center gap-4 px-5 py-3 text-left hover:bg-canvas"
+                    >
+                      <span className="w-32 shrink-0 text-sm tabular-nums sm:w-36">
+                        {format(g.start, timeFormat)} – {format(g.end, timeFormat)}
+                      </span>
+                      <span className="h-8 w-1 shrink-0 rounded-full border border-dashed border-ink-muted/50" aria-hidden="true" />
+                      <span className="flex-1 font-medium">{formatMinutes(g.minutes)} free</span>
+                      <span className="inline-flex items-center gap-1 text-sm text-ink-muted group-hover:text-ink">
+                        <PlusIcon className="size-4" />
+                        Plan
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ))}
+        </Card>
+      )}
+
       {editing && <EventDialog occurrence={editing} onClose={() => setEditing(null)} />}
+      {newEvent && <EventDialog timing={newEvent} onClose={() => setNewEvent(null)} />}
       {taskDialog && (
         <TaskDialog
           {...(taskDialog.task ? { task: taskDialog.task } : { defaultDueDate: toDateString(now) })}
@@ -272,6 +394,16 @@ function Card({ id, title, action, children }: { id: string; title: string; acti
       </header>
       {children}
     </section>
+  )
+}
+
+function Stat({ label, value, detail, danger }: { label: string; value: string; detail?: string; danger?: boolean }) {
+  return (
+    <div>
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className="mt-1 text-2xl font-semibold tabular-nums">{value}</dd>
+      {detail && <dd className={`text-xs ${danger ? 'font-medium text-danger' : 'text-ink-muted'}`}>{detail}</dd>}
+    </div>
   )
 }
 

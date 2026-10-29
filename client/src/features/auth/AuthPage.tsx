@@ -6,6 +6,7 @@ import { LogoMark } from '../../components/ui/Logo'
 import { browserTimeZone } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './auth-context'
+import { ForgotPasswordForm } from './PasswordReset'
 
 type Mode = 'sign-in' | 'sign-up'
 
@@ -22,6 +23,7 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [confirmationSentTo, setConfirmationSentTo] = useState<string | null>(null)
+  const [forgotPassword, setForgotPassword] = useState(false)
 
   if (session) {
     const from = (location.state as { from?: string } | null)?.from ?? '/'
@@ -83,7 +85,9 @@ export function AuthPage() {
         </Link>
 
         <div className="mt-8 rounded-2xl border border-line bg-surface p-6">
-          {confirmationSentTo ? (
+          {forgotPassword ? (
+            <ForgotPasswordForm initialEmail={email} onBack={() => setForgotPassword(false)} />
+          ) : confirmationSentTo ? (
             <div role="status">
               <h2 className="text-lg font-semibold">Check your email</h2>
               <p className="mt-2 text-sm text-ink-muted">
@@ -164,6 +168,18 @@ export function AuthPage() {
                     autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
                   />
                   {mode === 'sign-up' && <p className="mt-1 text-xs text-ink-muted">At least 8 characters.</p>}
+                  {mode === 'sign-in' && (
+                    <button
+                      type="button"
+                      className="mt-2 text-sm font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+                      onClick={() => {
+                        setError(null)
+                        setForgotPassword(true)
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                 </div>
                 {mode === 'sign-up' && (
                   <div>

@@ -30,6 +30,16 @@ It is not a Google Calendar clone. Its distinguishing features are:
 - **Calm.** Generous whitespace, clear type, restrained pastel colors.
 - **Incremental.** Ship a small version you use daily, then extend it.
 
+### Status (29 October 2026)
+
+v0.1 (core), v0.2 (reminders and PWA) and v0.3 (Academic Planner) are built. v0.1 and v0.2 are deployed on Vercel.
+Not built yet:
+
+- **Calendar:** the Day view's to-do list and the sidebar mini-calendar.
+- **v0.4 hardening:** the database export procedure, offline reading, export, and Playwright end-to-end tests.
+
+Sections below describe the full design. Where something isn't built yet, it is marked *(planned)*.
+
 ## 2. Non-goals
 
 These are deliberately out of scope. Revisit them only with a concrete need.
@@ -45,8 +55,8 @@ These are deliberately out of scope. Revisit them only with a concrete need.
 
 | Layer        | Choice                                                             | Notes                                                  |
 | ------------ | ------------------------------------------------------------------ | ------------------------------------------------------ |
-| UI           | React + TypeScript + Vite                                          | One codebase for desktop and mobile browsers           |
-| Styling      | Tailwind CSS                                                       | Design tokens defined once (see §5)                   |
+| UI           | React 19 + TypeScript + Vite, React Router                         | One codebase for desktop and mobile browsers           |
+| Styling      | Tailwind CSS v4                                                    | Design tokens defined once (see §5)                   |
 | Calendar UI  | FullCalendar (free plugins: daygrid, timegrid, list, interaction)  | Our event/recurrence model stays independent of it     |
 | Dates        | date-fns + date-fns-tz                                             | All time-zone math goes through one `lib/dates.ts`   |
 | Recurrence   | `rrule`                                                          | Expansion happens in our code, not inside FullCalendar |
@@ -55,8 +65,8 @@ These are deliberately out of scope. Revisit them only with a concrete need.
 | Server logic | Supabase Edge Functions                                            | Reminder generation and push delivery                  |
 | Scheduling   | Supabase Cron (`pg_cron`) invoking Edge Functions via `pg_net` |                                                        |
 | Push         | Web Push with VAPID keys                                           | Private key lives only in Edge Function secrets        |
-| Hosting      | Vercel Hobby or Cloudflare Pages                                   |                                                        |
-| Tests        | Vitest (unit), Playwright (end-to-end)                             |                                                        |
+| Hosting      | Vercel Hobby                                                       | `client/vercel.json` sends every route to the app      |
+| Tests        | Vitest (unit); Playwright (end-to-end, planned)                    |                                                        |
 
 Verify current free-tier limits and policies before relying on any of them.
 
@@ -67,18 +77,20 @@ Verify current free-tier limits and policies before relying on any of them.
 - Views: **Day**, **Week**, **Month**, **Agenda**. Previous/next navigation and a Today button.
 - Timed and all-day events, with title, time, category, location, and a reminder indicator.
 - Today, past dates and future dates are styled distinctly.
-- Overlap detection shows a warning, never a block.
-- **Month:** 7-column grid starting on the user's chosen weekday. At most 2–3 event pills per day, then `+N more`.
-- **Week:** 7 columns with an hourly rail. Defaults to 6:00–22:00 with scrolling outside that. Selecting a time range creates an event.
-- **Day:** hourly timeline plus a "To-Do Today" list for unscheduled tasks, the next event, and the daily intention.
+- Overlap detection shows a warning, never a block, in the event form and when scheduling a task.
+- Drag an event to move it, or drag its edge to resize it. On a recurring event this asks which occurrences to change.
+- **Month:** 7-column grid starting on the user's chosen weekday. At most 3 rows of events per day, then `+N more`.
+- **Week:** 7 columns with an hourly rail, scrolled to the "Day starts at" hour (default 6:00). Selecting a time range creates an event. Weekends and week numbers can be shown or hidden.
+- **Day:** hourly timeline. *(Planned: a "To-Do Today" list for unscheduled tasks, the next event, and the daily intention.)*
 - **Agenda:** chronological list grouped by date. This is the default on narrow screens.
+- The default view is a setting; "Automatic" means Week on wide screens and Agenda on phones.
 
 ### 4.2 Tasks
 
 - Fields: title, description, status (`pending` / `in_progress` / `completed`), priority (`low` / `medium` / `high`), category, and either a due date or a due date-time.
 - Also: estimated minutes, subtasks, reminders, and completion timestamp.
 - Actions: add, edit, delete, complete, reopen, and filter.
-- Views: **Today**, **Upcoming**, **Overdue**, **Completed**.
+- Views: **Today**, **Upcoming** (grouped by day, undated tasks last), **Overdue**, **Completed** (the 20 most recently completed).
 
 ### 4.3 Task time-blocking
 
@@ -91,11 +103,11 @@ Verify current free-tier limits and policies before relying on any of them.
 
 Recurrence is a core capability, used by classes, meetings, workouts, shifts and reading sessions alike.
 
-- Supported: daily, weekly (chosen weekdays), monthly (by date or by "2nd Tuesday"), interval ("every 2 weeks"), and an end date or count.
+- Supported: daily, weekly (chosen weekdays), monthly (by date or by "2nd Tuesday"), yearly, interval ("every 2 weeks"), and an end date or count.
 - A series is **one event row** with an `rrule`. Occurrences are expanded on demand for the visible range and never stored as copies.
 - Recurrence is expanded in the series' own IANA time zone, so "10:00 every Monday" stays at 10:00 local time.
 - Edit scopes:
-  - **This occurrence** writes an `event_exceptions` row, either cancelled or overridden.
+  - **This occurrence** writes an `event_exceptions` row, either cancelled or overridden (time, all-day dates, title, location, description or category).
   - **This and following** ends the original series the day before and creates a new series from the selected occurrence. Exceptions after the split move to the new series.
   - **All occurrences** updates the series row. If the time or rule changes, exceptions that no longer match an occurrence are removed, and the user is told how many.
 
@@ -104,29 +116,52 @@ Recurrence is a core capability, used by classes, meetings, workouts, shifts and
 - Presets: 5, 15, 30 and 60 minutes before, plus a custom offset. Several reminders per event or task are allowed.
 - Offsets are stored on the event or task (`reminder_offsets`). Concrete reminder rows are generated from them.
 - All-day events and date-only tasks remind relative to a default time-of-day from notification preferences (for example 08:00).
+- Default reminders for new events are a setting.
+- Settings → Notifications turns on push for the current device and sends a test notification.
 - Pipeline details are in §7.
 
 ### 4.6 Dashboard
 
 The dashboard answers: **"What do I need to know and do today?"**
 
-- Today's date, the next event with a countdown, and today's timeline.
-- Tasks due today and overdue tasks.
+- Today's date, the next event with a countdown, and today's schedule.
+- Tasks due today and overdue tasks, plus tasks completed today so a ticked-off task doesn't vanish.
 - Quick-add for events and tasks.
-- A short completion summary.
-- The daily intention or note.
-- Optional: free gaps between commitments.
+- **Daily intention:** a one-line focus for the day plus an optional note, saved as you type to `daily_notes` (one row per day).
+- **Today so far:** a completion summary showing tasks done out of today's plan (with a progress bar and the overdue count), events finished, and focus time blocked for tasks.
+- **Free time** (off by default): gaps of 30 minutes or more between timed events, from now (or the "Day starts at" hour) until 22:00. Tapping one opens a new event in that slot.
 
-Keep it to these items. Add no more cards without a reason.
+The summary and free-time logic is pure and unit-tested (`features/dashboard/today.ts`).
+
+Each section can be switched on or off in Settings → Today page. Keep it to these items. Add no more cards without a reason.
 
 ### 4.7 Categories and settings
 
 - Categories (life areas) are user-defined, each with a name and color, and can be archived. On first sign-in the app seeds defaults: Work, Personal, Health, Family, Projects, Study.
-- Settings: time zone (taken from the browser at sign-up), week start day, enabled modules, dashboard sections, and notification preferences.
+- Settings is one page with a section list that follows the scroll:
+  - **General:** name, appearance (System, Light or Dark, per device), and Install app.
+  - **Date & time:** time zone (taken from the browser at sign-up), start of week, and time format (12- or 24-hour).
+  - **View options:** default view, show weekends, show week numbers, day start hour, and default event duration.
+  - **Notifications:** push on this device with a test notification, default event reminders, and the all-day reminder time.
+  - **Categories:** add, rename, recolor, reorder and archive.
+  - **Today page:** which dashboard sections show.
+  - **Modules:** enable the Academic planner.
+  - **Account:** email, change password, and sign out.
+- Changes save as you make them, with a small saved/error toast.
+- Preferences live on `profiles`: `calendar_prefs`, `notification_prefs`, `dashboard_prefs` and `enabled_modules` (§6). The theme is per device, in `localStorage`.
 
 ### 4.8 Academic Planner (optional module)
 
-The module adds data; it never adds a second engine.
+The module adds data; it never adds a second engine. It lives at `/academic`, and its navigation item shows only while the module is on.
+
+- **Setup flow:** create a semester, add courses, then add class times. Each class time (type, days, start and end, room) becomes one weekly series ending on the semester's last day.
+- **The page:**
+  - semester picker with "Week 8 of 15"
+  - course cards with their class times
+  - a "Coming up" list of quizzes, exams and assignments
+  - a weekly timetable
+- **Calendar color:** academic events take their course's color. They're also filed under the Study category if you have one.
+- **Clash warnings:** shown while adding a class time, and as a banner listing overlapping classes.
 
 - A **semester** has a name, start date and end date.
 - A **course** has a code, title, color, and optional lecturer and venue. It belongs to a semester.
@@ -134,7 +169,7 @@ The module adds data; it never adds a second engine.
 - **Quizzes and exams** are events with `kind = 'quiz'` or `'exam'`.
 - **Assignments** are tasks with `course_id` set, so they get due dates, priority, subtasks and time-blocking for free.
 - Holidays and cancelled or moved classes are handled by ordinary `event_exceptions`.
-- Clash warnings reuse the general overlap check.
+- Clash warnings compare weekly class slots (`features/academic/timetable.ts`, unit-tested).
 
 **Lifecycle**
 
@@ -145,9 +180,26 @@ The module adds data; it never adds a second engine.
 ### 4.9 Cross-device and PWA
 
 - Responsive layout. Sign in on any device to see the same data.
-- Manifest, icons and a service worker for app-shell caching and push.
+- Manifest, icons and a hand-written service worker (`public/sw.js`):
+  - pages are network-first, with the cached app shell used offline
+  - built assets are cached
+  - the worker handles push messages and notification clicks
+- An **Install app** button in Settings uses Chrome's install prompt. The browser's own banner is suppressed on purpose, which is why the console logs "Banner not shown".
 - **iPhone/iPad:** Web Push only works after the app is added to the Home Screen (iOS 16.4+). Android Chrome and desktop browsers work from the browser tab.
 - Offline read access (cached recent range) is planned. Offline writes are out of scope until conflict rules are designed.
+
+### 4.10 Landing page and sign-in
+
+- **`/welcome`** is a public landing page with the product pitch, features, engineering notes and changelog. It follows light and dark mode.
+- **Signed-out visits:**
+  - to `/` in a browser → the landing page
+  - to `/` in the installed app → straight to sign-in
+  - to any other page → sign-in, then back to that page after signing in
+- **`/sign-in`** has *Sign in* and *Create account* tabs. `?mode=sign-up` opens on the second tab.
+  - Sign-up asks for the password twice and requires 8+ characters.
+  - Supabase sends a confirmation email before the first sign-in.
+  - A *Back to home* link returns to the landing page.
+- **Forgot password?** emails a reset link to `/reset-password`. Opening the link signs you in for recovery, and that page sets the new password. Without a valid link it shows "This link has expired".
 
 ## 5. Design System: "Sunset Cloud"
 
@@ -170,19 +222,33 @@ The module adds data; it never adds a second engine.
 | Text secondary | `#6B6870` |
 | Border         | `#E7E2E0` |
 
+### Dark mode
+
+`<html data-theme="light|dark">` switches the neutral tokens; components never change.
+
+| Token          | Dark        |
+| -------------- | ----------- |
+| Background     | `#19181B` |
+| Surface        | `#232126` |
+| Text primary   | `#ECE8EA` |
+| Text secondary | `#A9A4AC` |
+| Border         | `#39363C` |
+
+- The pastels don't change between themes. Text on them uses the `on-pastel` token, which is always dark.
+- The preference (System, Light, Dark) is stored per device, and "System" follows the OS live.
+- An inline script in `index.html` applies the theme before first paint, so there is no flash. `lib/theme.ts` then keeps it and the `theme-color` meta tag (the phone's status bar) in step.
+
 ### Rules
 
-- Text on pastel pills is always **dark charcoal**, never white. Check contrast with a tool.
+- Text on pastel pills is always **dark charcoal** (`on-pastel`), never white, in both themes. Check contrast with a tool.
 - Never use color alone to show category or status. Add a label or icon.
 - Keep visible keyboard focus rings and comfortable tap targets (about 44px minimum).
 - Show clear empty, loading, error and confirmation states.
 
 ### Layout
 
-- **Desktop:** a header (period title, Today, previous/next, view switcher); a sidebar (mini-calendar, modules, categories, quick-add); the main view; and an optional detail panel.
+- **Desktop:** a header (period title, Today, previous/next, view switcher); a sidebar (New event, New task, navigation and categories; a mini-calendar and module links are planned); the main view; and dialogs for editing.
 - **Mobile:** a compact top bar, a bottom navigation (Today · Calendar · Tasks · Settings), and a floating quick-add button. Agenda and Day views are the default.
-
-Dark mode is deferred (see §11), but all colors go through tokens so it can be added without a rewrite.
 
 ## 6. Data Model
 
@@ -200,7 +266,9 @@ Dark mode is deferred (see §11), but all colors go through tokens so it can be 
   - Semesters and courses are archived by default and deleted only explicitly.
   - Pending reminders are removed with their parent via cascade.
 
-### Schema (draft, to be refined in migrations)
+### Schema
+
+The migrations in `server/supabase/migrations/` are the source of truth. This is a summary of them.
 
 ```sql
 -- ---------- Profile & settings (one row per user) ----------
@@ -211,7 +279,8 @@ create table profiles (
   week_starts_on     smallint not null default 1 check (week_starts_on between 0 and 6),
   enabled_modules    text[] not null default '{}',  -- e.g. {'academic'}
   dashboard_prefs    jsonb not null default '{}',
-  notification_prefs jsonb not null default '{}',   -- e.g. {"all_day_reminder_time":"08:00"}
+  notification_prefs jsonb not null default '{}',   -- e.g. {"all_day_reminder_time":"08:00","default_event_reminders":[15]}
+  calendar_prefs     jsonb not null default '{}',   -- e.g. {"default_view":"timeGridWeek","time_format":"24h"}
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -345,13 +414,18 @@ create table event_exceptions (
   is_cancelled    boolean not null default false,
   new_start_at    timestamptz,
   new_end_at      timestamptz,
+  new_start_date  date,                            -- moved all-day occurrence
+  new_end_date    date,                            -- exclusive
   new_title       text,
   new_location    text,
   new_description text,
+  new_category_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (num_nonnulls(original_start, original_date) = 1),
+  check ((new_start_date is null) = (new_end_date is null)),
   foreign key (user_id, event_id) references events (user_id, id) on delete cascade,
+  foreign key (user_id, new_category_id) references categories (user_id, id) on delete set null (new_category_id),
   unique (event_id, original_start),
   unique (event_id, original_date)
 );
@@ -427,8 +501,9 @@ create policy own_rows on <table>
 
 Exceptions:
 
-- `profiles` uses `id` instead of `user_id`.
-- `reminders` is **select-only** for clients. Only server code using the service role inserts or updates it.
+- `profiles` uses `id` instead of `user_id`, and clients can only select and update it. The `handle_new_user` trigger creates the row at sign-up from the `timezone` and `display_name` the client passes, and seeds the default categories.
+- `reminders` is **select-only** for clients. Only server code using the service role inserts or updates it, through the `upsert_reminders` and `claim_due_reminders` functions.
+- Table privileges are a second layer behind RLS: `anon` has none.
 
 ### Fetching a visible range
 
@@ -444,9 +519,11 @@ This logic lives in one tested module, `features/recurrence`.
 ```text
 Event/task saved ──► DB trigger: cancel pending reminders for it
         │
-        └──► Edge Function `sync-reminders` (called after save)
+        └──► Edge Function `sync-reminders` (the app calls it after a save,
+                 debounced, with the user's JWT)
                  expands next 14 days of occurrences × offsets
-                 upserts reminder rows by idempotency_key
+                 upsert_reminders(): insert by idempotency_key, reviving
+                 pending/cancelled rows but never sent or failed ones
 
 Supabase Cron, hourly ──► `sync-reminders` for all series (rolls the 14-day window forward)
 
@@ -465,6 +542,8 @@ Supabase Cron, every minute ──► Edge Function `send-reminders`
     6. revoke subscriptions that return 404/410
 ```
 
+Cron reaches the Edge Functions through `invoke_edge_function()`, which reads the project URL and a secret API key from Vault. Both functions accept either a user JWT or that secret key. `send-reminders` called with a user JWT sends that user a test notification. The occurrence expansion lives in `functions/_shared/reminder-plan.ts`, a copy of the client's logic that is unit-tested from the client suite.
+
 ### Rules
 
 - The cancel trigger runs first, so a stale reminder can never fire even if `sync-reminders` fails.
@@ -480,29 +559,34 @@ Free Supabase projects may pause after a period of inactivity, and reminders sto
 ```text
 calendar/
 ├── client/                frontend (Vite + React); run npm scripts here
-│   ├── public/            manifest.webmanifest, icons/
+│   ├── public/            manifest.webmanifest, sw.js, favicon.svg, icons/
 │   ├── src/
 │   │   ├── app/           routes.tsx, providers.tsx
-│   │   ├── components/    layout/, ui/
+│   │   ├── components/    layout/ (AppShell, Header, Sidebar, BottomNav), ui/ (Dialog, Switch, Logo, icons…)
 │   │   ├── features/
+│   │   │   ├── auth/        # sign-in page, session, route guard, profile loader
+│   │   │   ├── landing/     # public /welcome page
 │   │   │   ├── calendar/  events/  tasks/  categories/
-│   │   │   ├── recurrence/          # expansion, exceptions, edit scopes
-│   │   │   ├── reminders/  dashboard/  settings/
-│   │   │   └── academic/
-│   │   ├── lib/           supabase.ts, dates.ts, validation.ts
+│   │   │   ├── recurrence/  # rules, expansion, exceptions, edit scopes
+│   │   │   ├── reminders/   # reminder picker, push subscription, sync trigger
+│   │   │   ├── dashboard/   # Today page
+│   │   │   ├── settings/  pwa/
+│   │   │   └── academic/    # semesters, courses, timetable, clashes
+│   │   ├── lib/           supabase.ts, dates.ts, validation.ts, theme.ts, use-now.ts
 │   │   ├── types/         database.ts (generated from Supabase)
-│   │   ├── styles/
+│   │   ├── styles/        index.css (tokens, dark theme, FullCalendar theming)
 │   │   └── main.tsx
-│   ├── tests/             unit/, e2e/
-│   └── .env.local         VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+│   ├── tests/             unit/ (Vitest); e2e/ (empty, planned)
+│   ├── vercel.json        SPA rewrite; no-cache for sw.js
+│   └── .env.local         VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_VAPID_PUBLIC_KEY
 ├── server/                backend; run the Supabase CLI here
 │   └── supabase/
-│       ├── migrations/
-│       └── functions/     sync-reminders/, send-reminders/
+│       ├── migrations/    core schema, calendar prefs, exception overrides, reminder pipeline
+│       └── functions/     sync-reminders/, send-reminders/, _shared/reminder-plan.ts
 └── README.md
 ```
 
-- Frontend: `cd client && npm install && npm run dev`.
+- Frontend: `cd client && npm install && npm run dev`. Also `npm test`, `npm run lint` and `npm run build` (type-checks first).
 - Backend: `cd server && supabase db push` (or pass `--workdir server` from the root).
 - Regenerate types: `cd server && supabase gen types typescript --linked > ../client/src/types/database.ts`.
 
@@ -527,16 +611,28 @@ Do these once per Supabase project. Installing on a phone and push both need the
    ```
    The migration already scheduled `send-reminders` every minute and `sync-reminders` hourly; they use these two secrets.
 4. **Frontend on Vercel.** Import the repo with **Root Directory** `client` (Vite preset). Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_VAPID_PUBLIC_KEY`. `client/vercel.json` sends every route to the app.
-5. **Auth URLs.** In Supabase Authentication → URL Configuration, set the Site URL to the Vercel URL and add it to Redirect URLs.
+   - Use the variable type **Config**, not Sensitive. Vercel warns about the `VITE_` prefix, but these values are public by design. Keep the prefix, because Vite only exposes `VITE_` variables. A variable's type can't be changed after saving, so delete it and add it again.
+   - Paste the **whole** publishable key, starting with `sb_publishable_`. A truncated key makes every sign-in fail with `401 Invalid API key`.
+   - Vite bakes these values in at build time. After changing one, **redeploy**.
+5. **Auth URLs.** In Supabase Authentication → URL Configuration, set the Site URL to the Vercel URL. Add `https://<your-app>.vercel.app/**` and `http://localhost:5173/**` to Redirect URLs. Supabase's built-in email sender is rate-limited to a few emails an hour.
 6. **On the phone.** Open the Vercel URL in Chrome (Android) or Safari (iPhone), sign in, then install: Settings → Install, or Chrome's ⋮ menu → *Add to home screen*. On iPhone use Share → *Add to Home Screen*. Open the installed app, go to Settings → Notifications → *Notifications on this device*, and send a test notification.
 
 To check the pipeline: `select status, last_error, remind_at from reminders order by remind_at desc limit 20;` and the cron history in `cron.job_run_details`.
+
+**Troubleshooting reminders.** If no notification arrives and the console shows a CORS error on `functions/v1/send-reminders`, the function isn't deployed: a missing function returns 404, which the browser reports as a CORS failure. Check with `supabase functions list`; both functions must be listed. Then check `cron.job_run_details` and the Vault secrets from step 3.
+
+**Troubleshooting sign-in.** A `400 invalid_credentials` means a wrong email or password. Check for a stale browser-saved password on the deployed domain. Use *Forgot password?* on the sign-in page, or set a password in the SQL editor:
+
+```sql
+update auth.users set encrypted_password = extensions.crypt('<new password>', extensions.gen_salt('bf'))
+where email = '<email>';
+```
 
 ## 9. Releases
 
 Each release should be **used daily** before the next one starts.
 
-### v0.1: Core (usable daily)
+### v0.1: Core (usable daily): built, apart from the export procedure
 
 - Scaffold Vite, React, TypeScript and Tailwind, plus the Sunset Cloud tokens.
 - Supabase project and migrations for profiles, categories, tasks, subtasks, events, event_exceptions and daily_notes. RLS on all of them.
@@ -546,15 +642,15 @@ Each release should be **used daily** before the next one starts.
 - Recurrence (daily, weekly, monthly, end date) with the three edit scopes.
 - Task time-blocking.
 - A basic dashboard.
-- Deployed. A manual database export procedure (`supabase db dump` plus a data dump) documented and tried once.
+- Deployed. *(Done.)* A manual database export procedure (`supabase db dump` plus a data dump) documented and tried once. *(Not done.)*
 
 **Done when:**
 
 - [ ] I can manage my real week on phone and laptop.
 - [ ] A second test account can't see or reference my data.
-- [ ] Recurrence unit tests pass.
+- [x] Recurrence unit tests pass.
 
-### v0.2: Reminders and PWA
+### v0.2: Reminders and PWA: built
 
 - Manifest, icons, service worker, and install flow (required for iOS push).
 - Push subscription management and a VAPID setup.
@@ -566,7 +662,7 @@ Each release should be **used daily** before the next one starts.
 - [ ] Editing or deleting an event never produces a stale notification.
 - [ ] A retried worker run never sends a duplicate.
 
-### v0.3: Academic Planner
+### v0.3: Academic Planner: built
 
 - Semesters, courses, class series, quizzes and exams, and assignments as tasks.
 - A semester setup flow: add courses, then weekly class times, which generates the series.
@@ -580,7 +676,7 @@ Each release should be **used daily** before the next one starts.
 
 > If a semester is in progress, v0.3 can come before v0.2.
 
-### v0.4: Hardening
+### v0.4: Hardening: planned
 
 - Offline read access for the recent range.
 - JSON export and `.ics` export.
@@ -595,13 +691,17 @@ Each release should be **used daily** before the next one starts.
 
 ## 10. Testing
 
-**Unit (Vitest)**
+**Unit (Vitest)**: `cd client && npm test` (94 tests)
 
-- Recurrence expansion, exceptions, and the three edit scopes.
-- Time-zone handling.
-- Task status rules.
-- Reminder time calculation, including all-day and date-only cases.
-- Module enable/disable.
+- `recurrence.test.ts`: rule building and parsing, expansion, exceptions, the three edit scopes, and DST.
+- `reminder-plan.test.ts`: reminder times, including all-day and date-only cases and the 14-day window.
+- `task-views.test.ts`: which view a task belongs in, sorting and due labels.
+- `timing.test.ts`: event timing and time-zone handling.
+- `today.test.ts`: the Today page's free-time gaps and completion summary.
+- `timetable.test.ts`: class slots, clash detection, first class dates, and the default semester.
+- `prefs.test.ts`: reading stored preferences safely.
+- `validation.test.ts`: form validation.
+- Planned: module enable/disable.
 
 **Integration (local Supabase)**
 
@@ -609,7 +709,7 @@ Each release should be **used daily** before the next one starts.
 - Event edit and delete cancel and regenerate reminders.
 - Worker claiming is idempotent under concurrent runs.
 
-**End-to-end (Playwright)**
+**End-to-end (Playwright)**: planned for v0.4; Playwright is installed and `tests/e2e/` is empty
 
 - Create and edit an event.
 - Create and complete a task.
@@ -634,7 +734,6 @@ These are not specified yet. Design them when their turn comes.
 - Weekly review: planned vs. completed, overdue items, time by category, and a reflection.
 - Habit tracking.
 - Year view.
-- Dark mode.
 - Free-time-gap suggestions for time-blocking.
 - `.ics` import.
 - Natural-language quick-add.
@@ -657,11 +756,8 @@ These are not specified yet. Design them when their turn comes.
 - Store no recurrence occurrences except the 14-day reminder window.
 - Watch database, function-invocation and egress usage monthly.
 
-## 13. First Steps
+## 13. Next Steps
 
-1. Create the GitHub repo and scaffold Vite, React, TypeScript and Tailwind.
-2. Add the design tokens and the responsive shell (header, sidebar, bottom navigation).
-3. Create the Supabase project, write the first migration from §6, and enable RLS.
-4. Build auth and event CRUD with the Week and Agenda views.
-5. Add tasks, then the recurrence module with its unit tests.
-6. Deploy and start using it daily. That's v0.1.
+1. Finish v0.1: the database export procedure, tried once.
+2. Check off the v0.2 and v0.3 "Done when" items on a real phone and laptop.
+3. Harden (v0.4): offline reading, export, the accessibility pass, Playwright in CI, and a restore test.

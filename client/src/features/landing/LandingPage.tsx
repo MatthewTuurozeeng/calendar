@@ -206,15 +206,15 @@ export function LandingPage() {
                 <Line>
                   <span className="text-dusty-orange">$</span> npm test
                 </Line>
-                {['prefs', 'recurrence', 'reminder-plan', 'task-views', 'timing', 'validation'].map((name) => (
+                {['prefs', 'recurrence', 'reminder-plan', 'task-views', 'timetable', 'timing', 'today', 'validation'].map((name) => (
                   <Line key={name}>
                     <span className="text-[#8fc79a]">✓</span> tests/unit/{name}.test.ts
                   </Line>
                 ))}
                 <Line>&nbsp;</Line>
                 <Line>
-                  <span className="text-[#a7a2aa]">Tests</span> <span className="text-[#8fc79a]">73 passed</span>
-                  <span className="text-[#a7a2aa]"> (73)</span>
+                  <span className="text-[#a7a2aa]">Tests</span> <span className="text-[#8fc79a]">94 passed</span>
+                  <span className="text-[#a7a2aa]"> (94)</span>
                 </Line>
               </CodeWindow>
             </div>
@@ -232,10 +232,10 @@ export function LandingPage() {
             <Release version="v0.2" name="Reminders & PWA" status="shipped">
               Web Push reminders, the reminder pipeline, install on any device, light and dark.
             </Release>
-            <Release version="v0.3" name="Academic Planner" status="next">
+            <Release version="v0.3" name="Academic Planner" status="shipped">
               Semesters, courses and class series, exams, assignments and clash warnings.
             </Release>
-            <Release version="v0.4" name="Hardening" status="planned">
+            <Release version="v0.4" name="Hardening" status="next">
               Offline reading, JSON and .ics export, end-to-end tests in CI.
             </Release>
           </ol>
