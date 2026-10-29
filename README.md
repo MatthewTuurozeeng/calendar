@@ -36,7 +36,7 @@ v0.1 (core), v0.2 (reminders and PWA) and v0.3 (Academic Planner) are built. v0.
 Not built yet:
 
 - **Calendar:** the Day view's to-do list and the sidebar mini-calendar.
-- **v0.4 hardening:** the database export procedure, offline reading, export, and Playwright end-to-end tests.
+- **v0.4 hardening:** the database export procedure, JSON and `.ics` export, the accessibility pass, Playwright end-to-end tests, and a restore test. (Offline reading is built.)
 
 Sections below describe the full design. Where something isn't built yet, it is marked *(planned)*.
 
@@ -186,7 +186,12 @@ The module adds data; it never adds a second engine. It lives at `/academic`, an
   - the worker handles push messages and notification clicks
 - An **Install app** button in Settings uses Chrome's install prompt. The browser's own banner is suppressed on purpose, which is why the console logs "Banner not shown".
 - **iPhone/iPad:** Web Push only works after the app is added to the Home Screen (iOS 16.4+). Android Chrome and desktop browsers work from the browser tab.
-- Offline read access (cached recent range) is planned. Offline writes are out of scope until conflict rules are designed.
+- **Offline reading:**
+  - The service worker keeps copies of database reads (`/rest/v1/` GETs) in the `data-v1` cache, up to the 300 most recent. Reads always try the network first; offline, the last good answer is served.
+  - Pages you've opened on the device (Today, Tasks, the calendar weeks you've viewed, Academic, Settings) still show their data offline.
+  - An "You're offline" banner explains that changes can't be saved.
+  - The cache is deleted on sign-out.
+- Offline writes are out of scope until conflict rules are designed.
 
 ### 4.10 Landing page and sign-in
 
@@ -572,7 +577,7 @@ calendar/
 │   │   │   ├── dashboard/   # Today page
 │   │   │   ├── settings/  pwa/
 │   │   │   └── academic/    # semesters, courses, timetable, clashes
-│   │   ├── lib/           supabase.ts, dates.ts, validation.ts, theme.ts, use-now.ts
+│   │   ├── lib/           supabase.ts, dates.ts, validation.ts, theme.ts, use-now.ts, offline.ts
 │   │   ├── types/         database.ts (generated from Supabase)
 │   │   ├── styles/        index.css (tokens, dark theme, FullCalendar theming)
 │   │   └── main.tsx
@@ -676,9 +681,9 @@ Each release should be **used daily** before the next one starts.
 
 > If a semester is in progress, v0.3 can come before v0.2.
 
-### v0.4: Hardening: planned
+### v0.4: Hardening: in progress
 
-- Offline read access for the recent range.
+- Offline read access for the recent range. *(Done.)*
 - JSON export and `.ics` export.
 - An accessibility pass.
 - Playwright end-to-end suite for the core flows.
@@ -760,4 +765,4 @@ These are not specified yet. Design them when their turn comes.
 
 1. Finish v0.1: the database export procedure, tried once.
 2. Check off the v0.2 and v0.3 "Done when" items on a real phone and laptop.
-3. Harden (v0.4): offline reading, export, the accessibility pass, Playwright in CI, and a restore test.
+3. Harden (v0.4): export, the accessibility pass, Playwright in CI, and a restore test.

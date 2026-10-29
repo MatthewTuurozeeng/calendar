@@ -1,8 +1,11 @@
-// Service worker: app-shell caching and push notifications (README §4.9, §7).
+// Service worker: app-shell caching, offline reading and push notifications (README §4.9, §7).
 // Plain JS in public/ so it's served at /sw.js and controls the whole app.
 
 const CACHE = 'app-shell-v1'
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/favicon.svg']
+// Copies of database reads, for offline viewing. The app deletes it on sign-out.
+const DATA_CACHE = 'data-v1'
+const DATA_LIMIT = 300
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)))
@@ -13,7 +16,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== DATA_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   )
 })
@@ -21,8 +24,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
-  // Only this app's own GETs; Supabase and other APIs always go to the network.
-  if (request.method !== 'GET' || url.origin !== self.location.origin) return
+  if (request.method !== 'GET') return
+
+  // Database reads: network first; the last good answer when offline.
+  // Writes, auth and Edge Functions always go to the network.
+  if (url.hostname.endsWith('.supabase.co') && url.pathname.startsWith('/rest/v1/')) {
+    event.respondWith(networkThenData(request))
+    return
+  }
+
+  // Otherwise only this app's own files.
+  if (url.origin !== self.location.origin) return
 
   // Pages: network first so deploys show up, cached shell when offline.
   if (request.mode === 'navigate') {
@@ -55,6 +67,34 @@ self.addEventListener('fetch', (event) => {
     )
   }
 })
+
+/** The same URL can be read as a list or as one object, so the Accept header is part of the key. */
+function dataKey(request) {
+  const url = new URL(request.url)
+  url.searchParams.set('__accept', request.headers.get('accept') || '')
+  return url.toString()
+}
+
+async function networkThenData(request) {
+  const key = dataKey(request)
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const copy = response.clone()
+      caches.open(DATA_CACHE).then(async (cache) => {
+        await cache.put(key, copy)
+        // Oldest first: keep the cache to the most recent reads.
+        const keys = await cache.keys()
+        await Promise.all(keys.slice(0, Math.max(0, keys.length - DATA_LIMIT)).map((k) => cache.delete(k)))
+      })
+    }
+    return response
+  } catch (err) {
+    const cached = await caches.match(key, { cacheName: DATA_CACHE })
+    if (cached) return cached
+    throw err
+  }
+}
 
 // Payload from send-reminders: { title, body, url, tag }.
 self.addEventListener('push', (event) => {
