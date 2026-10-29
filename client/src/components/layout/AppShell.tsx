@@ -44,7 +44,7 @@ export function AppShell() {
         type="button"
         onClick={onTasks ? openNewTask : openQuickAdd}
         aria-label={onTasks ? 'New task' : 'New event'}
-        className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] grid size-14 place-items-center rounded-full bg-accent text-ink shadow-lg shadow-ink/15 md:hidden"
+        className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] grid size-14 place-items-center rounded-full bg-accent text-on-pastel shadow-lg shadow-black/20 md:hidden"
       >
         <PlusIcon />
       </button>

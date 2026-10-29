@@ -22,7 +22,7 @@ export function Dialog({ labelledBy, onClose, children }: DialogProps) {
       // React bubbles a nested dialog's close event up to this one; ignore it.
       onClose={(e) => e.target === e.currentTarget && onClose()}
       aria-labelledby={labelledBy}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100%-2rem))] overflow-y-auto rounded-2xl border border-line bg-surface p-6 text-ink shadow-xl backdrop:bg-ink/30"
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100%-2rem))] overflow-y-auto rounded-2xl border border-line bg-surface p-6 text-ink shadow-xl backdrop:bg-black/40"
     >
       {children}
       {/* After the content so opening the dialog still focuses its first field; shown top-right. */}

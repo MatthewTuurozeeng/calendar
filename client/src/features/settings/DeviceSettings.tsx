@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { secondaryButtonClass } from '../../components/ui/form'
 import { Switch } from '../../components/ui/Switch'
+import { getThemePreference, setThemePreference, type ThemePreference } from '../../lib/theme'
 import { useSession } from '../auth/auth-context'
 import { isInstalled, useInstallPrompt } from '../pwa/install'
 import { disablePush, enablePush, getPushState, sendTestNotification, type PushState } from '../reminders/push'
@@ -124,4 +125,44 @@ export function PushNotificationsRow({ track }: { track: TrackSave }) {
   
 }
 
+const THEMES: { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+]
 
+/** Light or dark, for this device; "System" follows the phone or computer setting. */
+export function AppearanceRow() {
+  const [theme, setTheme] = useState(getThemePreference)
+
+  function choose(value: ThemePreference) {
+    setTheme(value)
+    setThemePreference(value)
+  }
+
+  return (
+    <SettingRow id="appearance" label="Appearance" description="Applies to this device.">
+      <div
+        id="appearance"
+        role="group"
+        aria-labelledby="appearance-label"
+        aria-describedby="appearance-description"
+        className="flex rounded-xl bg-line/60 p-1"
+      >
+        {THEMES.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={theme === value}
+            onClick={() => choose(value)}
+            className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-medium ${
+              theme === value ? 'bg-surface shadow-sm' : 'text-ink-muted'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </SettingRow>
+  )
+}

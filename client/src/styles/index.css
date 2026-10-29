@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
-/* Sunset Cloud design tokens (README §5). All colors go through these so
-   dark mode can later redefine them without touching components. */
+/* Sunset Cloud design tokens (README §5). All colors go through these;
+   dark mode redefines the neutrals below without touching components. */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -12,15 +12,34 @@
   --color-ink-muted: #6b6870;
   --color-line: #e7e2e0;
 
-  /* Category palette. Text on these is always ink, never white. */
+  /* Category palette. Text on these is always on-pastel, never white. */
   --color-dusty-orange: #f08d7e;
   --color-warm-peach: #efa18a;
   --color-soft-rose: #e2bab1;
   --color-periwinkle: #acaec5;
   --color-rose-pink: #dda6b9;
 
+  /* Dark text for solid pastel backgrounds; the same in both themes. */
+  --color-on-pastel: #29272a;
+
   --color-accent: var(--color-dusty-orange);
   --color-danger: #a2402f;
+}
+
+/* Dark theme. data-theme is set before first paint (index.html, lib/theme.ts). */
+:root[data-theme='dark'] {
+  --color-canvas: #19181b;
+  --color-surface: #232126;
+  --color-ink: #ece8ea;
+  --color-ink-muted: #a9a4ac;
+  --color-line: #39363c;
+  --color-danger: #f19a8b;
+  /* Native date and time pickers, selects and scrollbars follow the theme. */
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 @layer base {
