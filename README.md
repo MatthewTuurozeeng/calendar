@@ -32,12 +32,11 @@ It is not a Google Calendar clone. Its distinguishing features are:
 
 ### Status (29 October 2026)
 
-v0.1 (core) and v0.2 (reminders and PWA) are built and deployed on Vercel.
+v0.1 (core), v0.2 (reminders and PWA) and v0.3 (Academic Planner) are built. v0.1 and v0.2 are deployed on Vercel.
 Not built yet:
 
 - **Calendar:** the Day view's to-do list and the sidebar mini-calendar.
-- **Academic Planner (v0.3):** only the Modules switch exists; `features/academic/` is empty.
-- **v0.4 hardening:** the database export procedure and Playwright end-to-end tests.
+- **v0.4 hardening:** the database export procedure, offline reading, export, and Playwright end-to-end tests.
 
 Sections below describe the full design. Where something isn't built yet, it is marked *(planned)*.
 
@@ -151,9 +150,18 @@ Each section can be switched on or off in Settings → Today page. Keep it to th
 - Changes save as you make them, with a small saved/error toast.
 - Preferences live on `profiles`: `calendar_prefs`, `notification_prefs`, `dashboard_prefs` and `enabled_modules` (§6). The theme is per device, in `localStorage`.
 
-### 4.8 Academic Planner (optional module, planned for v0.3)
+### 4.8 Academic Planner (optional module)
 
-The module adds data; it never adds a second engine. The tables (`semesters`, `courses`, and `course_id` and `kind` on events and tasks) already exist; the UI does not.
+The module adds data; it never adds a second engine. It lives at `/academic`, and its navigation item shows only while the module is on.
+
+- **Setup flow:** create a semester, add courses, then add class times. Each class time (type, days, start and end, room) becomes one weekly series ending on the semester's last day.
+- **The page:**
+  - semester picker with "Week 8 of 15"
+  - course cards with their class times
+  - a "Coming up" list of quizzes, exams and assignments
+  - a weekly timetable
+- **Calendar color:** academic events take their course's color. They're also filed under the Study category if you have one.
+- **Clash warnings:** shown while adding a class time, and as a banner listing overlapping classes.
 
 - A **semester** has a name, start date and end date.
 - A **course** has a code, title, color, and optional lecturer and venue. It belongs to a semester.
@@ -161,7 +169,7 @@ The module adds data; it never adds a second engine. The tables (`semesters`, `c
 - **Quizzes and exams** are events with `kind = 'quiz'` or `'exam'`.
 - **Assignments** are tasks with `course_id` set, so they get due dates, priority, subtasks and time-blocking for free.
 - Holidays and cancelled or moved classes are handled by ordinary `event_exceptions`.
-- Clash warnings reuse the general overlap check.
+- Clash warnings compare weekly class slots (`features/academic/timetable.ts`, unit-tested).
 
 **Lifecycle**
 
@@ -191,6 +199,7 @@ The module adds data; it never adds a second engine. The tables (`semesters`, `c
   - Sign-up asks for the password twice and requires 8+ characters.
   - Supabase sends a confirmation email before the first sign-in.
   - A *Back to home* link returns to the landing page.
+- **Forgot password?** emails a reset link to `/reset-password`. Opening the link signs you in for recovery, and that page sets the new password. Without a valid link it shows "This link has expired".
 
 ## 5. Design System: "Sunset Cloud"
 
@@ -562,7 +571,7 @@ calendar/
 │   │   │   ├── reminders/   # reminder picker, push subscription, sync trigger
 │   │   │   ├── dashboard/   # Today page
 │   │   │   ├── settings/  pwa/
-│   │   │   └── academic/    # empty until v0.3
+│   │   │   └── academic/    # semesters, courses, timetable, clashes
 │   │   ├── lib/           supabase.ts, dates.ts, validation.ts, theme.ts, use-now.ts
 │   │   ├── types/         database.ts (generated from Supabase)
 │   │   ├── styles/        index.css (tokens, dark theme, FullCalendar theming)
@@ -610,7 +619,9 @@ Do these once per Supabase project. Installing on a phone and push both need the
 
 To check the pipeline: `select status, last_error, remind_at from reminders order by remind_at desc limit 20;` and the cron history in `cron.job_run_details`.
 
-**Troubleshooting sign-in.** A `400 invalid_credentials` means a wrong email or password. Check for a stale browser-saved password on the deployed domain. There's no in-app password reset yet; set a new password in the SQL editor:
+**Troubleshooting reminders.** If no notification arrives and the console shows a CORS error on `functions/v1/send-reminders`, the function isn't deployed: a missing function returns 404, which the browser reports as a CORS failure. Check with `supabase functions list`; both functions must be listed. Then check `cron.job_run_details` and the Vault secrets from step 3.
+
+**Troubleshooting sign-in.** A `400 invalid_credentials` means a wrong email or password. Check for a stale browser-saved password on the deployed domain. Use *Forgot password?* on the sign-in page, or set a password in the SQL editor:
 
 ```sql
 update auth.users set encrypted_password = extensions.crypt('<new password>', extensions.gen_salt('bf'))
@@ -651,7 +662,7 @@ Each release should be **used daily** before the next one starts.
 - [ ] Editing or deleting an event never produces a stale notification.
 - [ ] A retried worker run never sends a duplicate.
 
-### v0.3: Academic Planner: next
+### v0.3: Academic Planner: built
 
 - Semesters, courses, class series, quizzes and exams, and assignments as tasks.
 - A semester setup flow: add courses, then weekly class times, which generates the series.
@@ -680,13 +691,14 @@ Each release should be **used daily** before the next one starts.
 
 ## 10. Testing
 
-**Unit (Vitest)**: `cd client && npm test` (81 tests)
+**Unit (Vitest)**: `cd client && npm test` (94 tests)
 
 - `recurrence.test.ts`: rule building and parsing, expansion, exceptions, the three edit scopes, and DST.
 - `reminder-plan.test.ts`: reminder times, including all-day and date-only cases and the 14-day window.
 - `task-views.test.ts`: which view a task belongs in, sorting and due labels.
 - `timing.test.ts`: event timing and time-zone handling.
 - `today.test.ts`: the Today page's free-time gaps and completion summary.
+- `timetable.test.ts`: class slots, clash detection, first class dates, and the default semester.
 - `prefs.test.ts`: reading stored preferences safely.
 - `validation.test.ts`: form validation.
 - Planned: module enable/disable.
@@ -725,7 +737,6 @@ These are not specified yet. Design them when their turn comes.
 - Free-time-gap suggestions for time-blocking.
 - `.ics` import.
 - Natural-language quick-add.
-- An in-app "Forgot password?" flow.
 - Offline editing with conflict resolution.
 - Additional modules, such as a work planner or fitness planner.
 
@@ -748,6 +759,5 @@ These are not specified yet. Design them when their turn comes.
 ## 13. Next Steps
 
 1. Finish v0.1: the database export procedure, tried once.
-2. Check off the v0.2 "Done when" items on a real phone and laptop.
-3. Build the Academic Planner (v0.3).
-4. Harden (v0.4): offline reading, export, the accessibility pass, Playwright in CI, and a restore test.
+2. Check off the v0.2 and v0.3 "Done when" items on a real phone and laptop.
+3. Harden (v0.4): offline reading, export, the accessibility pass, Playwright in CI, and a restore test.

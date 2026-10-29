@@ -1,14 +1,17 @@
 import { NavLink } from 'react-router'
-import { NAV_ITEMS } from './nav'
+import { useUserData } from '../../features/auth/user-data'
+import { visibleNavItems } from './nav'
 
 export function BottomNav() {
+  const { profile } = useUserData()
+  const items = visibleNavItems(profile.enabled_modules)
   return (
     <nav
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul className="grid grid-cols-4">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+      <ul className="grid" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+        {items.map(({ to, label, icon: Icon }) => (
           <li key={to}>
             <NavLink
               to={to}
