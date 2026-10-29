@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router'
 import { useUserData } from '../../features/auth/user-data'
 import { PlusIcon } from '../ui/icons'
-import { NAV_ITEMS } from './nav'
+import { visibleNavItems } from './nav'
 
 type SidebarProps = {
   onNewEvent: () => void
@@ -9,7 +9,7 @@ type SidebarProps = {
 }
 
 export function Sidebar({ onNewEvent, onNewTask }: SidebarProps) {
-  const { categories } = useUserData()
+  const { categories, profile } = useUserData()
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-4 py-5 md:flex">
@@ -36,7 +36,7 @@ export function Sidebar({ onNewEvent, onNewTask }: SidebarProps) {
 
       <nav aria-label="Main">
         <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {visibleNavItems(profile.enabled_modules).map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}
