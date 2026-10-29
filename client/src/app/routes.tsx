@@ -4,10 +4,12 @@ import { AuthPage } from '../features/auth/AuthPage'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { CalendarPage } from '../features/calendar/CalendarPage'
 import { TodayPage } from '../features/dashboard/TodayPage'
+import { LandingPage } from '../features/landing/LandingPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { TasksPage } from '../features/tasks/TasksPage'
 
 export const router = createBrowserRouter([
+  { path: '/welcome', element: <LandingPage /> },
   { path: '/sign-in', element: <AuthPage /> },
   {
     element: (
