@@ -17,7 +17,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   if (loading) return <FullPageStatus>Loading…</FullPageStatus>
-  if (!session) return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />
+  if (!session) {
+    // The front door gets the landing page; deep links go straight to sign-in.
+    if (location.pathname === '/') return <Navigate to="/welcome" replace />
+    return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />
+  }
 
   return <UserDataLoader userId={session.user.id}>{children}</UserDataLoader>
 }

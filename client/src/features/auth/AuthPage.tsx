@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation } from 'react-router'
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router'
 import { errorClass, inputClass, labelClass, primaryButtonClass } from '../../components/ui/form'
+import { ArrowRightIcon } from '../../components/ui/icons'
+import { LogoMark } from '../../components/ui/Logo'
 import { browserTimeZone } from '../../lib/dates'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './auth-context'
@@ -10,9 +12,12 @@ type Mode = 'sign-in' | 'sign-up'
 export function AuthPage() {
   const { session } = useAuth()
   const location = useLocation()
-  const [mode, setMode] = useState<Mode>('sign-in')
+  const [searchParams] = useSearchParams()
+  // The landing page's "Get started" links here with ?mode=sign-up.
+  const [mode, setMode] = useState<Mode>(searchParams.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -26,6 +31,11 @@ export function AuthPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    if (mismatch) {
+      // The message is already shown under the field.
+      document.getElementById('confirm-password')?.focus()
+      return
+    }
     setPending(true)
 
     if (mode === 'sign-in') {
@@ -48,15 +58,29 @@ export function AuthPage() {
     setPending(false)
   }
 
+  // Shown once they've started typing the confirmation.
+  const mismatch = mode === 'sign-up' && confirmPassword !== '' && confirmPassword !== password
+
   function switchMode(next: Mode) {
     setMode(next)
     setError(null)
+    setConfirmPassword('')
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-10">
+    <main className="relative grid min-h-dvh place-items-center px-4 py-16">
+      <Link
+        to="/welcome"
+        className="absolute top-4 left-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium text-ink-muted hover:bg-surface hover:text-ink sm:top-6 sm:left-6"
+      >
+        <ArrowRightIcon className="size-4 rotate-180" />
+        Back to home
+      </Link>
       <div className="w-full max-w-sm">
-        <h1 className="text-center text-2xl font-semibold">Calendar</h1>
+        <Link to="/welcome" className="mx-auto flex w-fit items-center gap-2.5 text-2xl font-semibold">
+          <LogoMark />
+          <h1>Calendar</h1>
+        </Link>
 
         <div className="mt-8 rounded-2xl border border-line bg-surface p-6">
           {confirmationSentTo ? (
@@ -141,6 +165,29 @@ export function AuthPage() {
                   />
                   {mode === 'sign-up' && <p className="mt-1 text-xs text-ink-muted">At least 8 characters.</p>}
                 </div>
+                {mode === 'sign-up' && (
+                  <div>
+                    <label htmlFor="confirm-password" className={labelClass}>
+                      Confirm password
+                    </label>
+                    <input
+                      id="confirm-password"
+                      type="password"
+                      required
+                      className={inputClass}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                      aria-invalid={mismatch}
+                      aria-describedby={mismatch ? 'confirm-password-hint' : undefined}
+                    />
+                    {mismatch && (
+                      <p id="confirm-password-hint" className={errorClass}>
+                        The passwords don't match.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {error && (
                   <p role="alert" className={errorClass}>
