@@ -4,6 +4,7 @@ import { FullPageStatus } from '../../components/ui/FullPageStatus'
 import { secondaryButtonClass } from '../../components/ui/form'
 import { supabase } from '../../lib/supabase'
 import type { TablesUpdate } from '../../types/database'
+import { isInstalled } from '../pwa/install'
 import { useAuth } from './auth-context'
 import { UserDataContext, type Category, type Profile, type UserData } from './user-data'
 
@@ -18,8 +19,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (loading) return <FullPageStatus>Loading…</FullPageStatus>
   if (!session) {
-    // The front door gets the landing page; deep links go straight to sign-in.
-    if (location.pathname === '/') return <Navigate to="/welcome" replace />
+    // The front door gets the landing page in a browser. The installed app, and
+    // deep links, go straight to sign-in; "Back to home" still reaches the landing page.
+    if (location.pathname === '/' && !isInstalled()) return <Navigate to="/welcome" replace />
     return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />
   }
 

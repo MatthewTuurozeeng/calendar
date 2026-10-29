@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, Navigate } from 'react-router'
+import { Link } from 'react-router'
 import {
   ArrowRightIcon,
   BellIcon,
@@ -13,7 +13,6 @@ import {
 import { LogoMark } from '../../components/ui/Logo'
 import { primaryButtonClass, secondaryButtonClass } from '../../components/ui/form'
 import { useAuth } from '../auth/auth-context'
-import { isInstalled } from '../pwa/install'
 
 // The public front page for signed-out visitors. Everything here is static:
 // the "product preview" is drawn with the app's own tokens, not a screenshot,
@@ -24,8 +23,6 @@ const eyebrowClass = 'font-mono text-xs tracking-wider text-dusty-orange upperca
 
 export function LandingPage() {
   const { session } = useAuth()
-  // The installed app opens straight to sign-in; the pitch is for the browser.
-  if (!session && isInstalled()) return <Navigate to="/sign-in" replace />
   const signedIn = !!session
 
   return (
