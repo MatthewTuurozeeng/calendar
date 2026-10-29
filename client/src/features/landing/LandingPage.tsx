@@ -236,7 +236,7 @@ export function LandingPage() {
               Semesters, courses and class series, exams, assignments and clash warnings.
             </Release>
             <Release version="v0.4" name="Hardening" status="next">
-              Offline reading, JSON and .ics export, end-to-end tests in CI.
+              Offline reading (done), JSON and .ics export, end-to-end tests in CI.
             </Release>
           </ol>
         </section>

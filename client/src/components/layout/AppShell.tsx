@@ -6,6 +6,7 @@ import { defaultTiming, type EventTiming } from '../../features/events/timing'
 import { useReminderSync } from '../../features/reminders/sync'
 import { calendarPrefs } from '../../features/settings/prefs'
 import { TaskDialog } from '../../features/tasks/TaskDialog'
+import { useOnline } from '../../lib/offline'
 import { defaultDueDate, taskViewFromParams } from '../../features/tasks/views'
 import { PlusIcon } from '../ui/icons'
 import { BottomNav } from './BottomNav'
@@ -14,6 +15,7 @@ import { Sidebar } from './Sidebar'
 
 export function AppShell() {
   const { profile } = useUserData()
+  const online = useOnline()
   useReminderSync()
   const [quickAdd, setQuickAdd] = useState<EventTiming | null>(null)
   const openQuickAdd = () => setQuickAdd(defaultTiming(new Date(), calendarPrefs(profile).default_event_minutes))
@@ -32,6 +34,15 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
+        {!online && (
+          <p
+            role="status"
+            className="border-b border-line bg-periwinkle/30 px-4 py-2 text-center text-sm md:px-8"
+          >
+            <span className="font-medium">You're offline.</span> Showing what was last loaded on this device. Changes
+            can't be saved until you're back online.
+          </p>
+        )}
         <main className="flex-1 px-4 pt-4 pb-32 md:px-8 md:pt-6 md:pb-8">
           <Outlet />
         </main>

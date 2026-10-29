@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { clearOfflineData } from '../../lib/offline'
 import { supabase } from '../../lib/supabase'
 import { AuthContext, type AuthState } from './auth-context'
 
@@ -7,7 +8,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Fires once with the stored session (INITIAL_SESSION), then on every sign-in/out.
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Don't leave the last user's data readable on a shared device.
+      if (event === 'SIGNED_OUT') void clearOfflineData()
       setState({ session, loading: false })
     })
     return () => data.subscription.unsubscribe()
