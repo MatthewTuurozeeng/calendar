@@ -69,13 +69,7 @@ export function LandingPage() {
           <DotGrid />
           <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:pt-24 [&>*]:min-w-0">
             <div>
-              <a
-                href="#changelog"
-                className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs text-ink-muted hover:text-ink"
-              >
-                <span className="size-1.5 rounded-full bg-dusty-orange" aria-hidden="true" />
-                <span className="font-mono">v0.2</span> Push reminders and an installable app
-              </a>
+             
               <h1 className="mt-6 text-4xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-5xl">
                 Plan your week the way you{' '}
                 <span className="relative whitespace-nowrap">
@@ -105,9 +99,7 @@ export function LandingPage() {
                   </>
                 )}
               </div>
-              <p className="mt-6 font-mono text-xs text-ink-muted">
-                Works in the browser · Installs on Android, iOS and desktop
-              </p>
+             
             </div>
 
             <ProductPreview />
@@ -117,17 +109,12 @@ export function LandingPage() {
         {/* ---------- Stack strip ---------- */}
         <section aria-label="Built with" className="border-y border-line bg-surface">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 py-6 font-mono text-sm text-ink-muted sm:px-6">
-            {['React 19', 'TypeScript', 'Vite', 'Tailwind CSS', 'Supabase', 'Postgres', 'Deno Edge Functions', 'Web Push'].map(
-              (name) => (
-                <span key={name}>{name}</span>
-              ),
-            )}
+    
           </div>
         </section>
 
         {/* ---------- Features ---------- */}
         <section id="features" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
-          <p className={eyebrowClass}>Features</p>
           <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-balance">
             Everything a busy week needs. Nothing it doesn't.
           </h2>
@@ -160,7 +147,6 @@ export function LandingPage() {
         <section id="engineering" className="scroll-mt-16 border-y border-line bg-surface">
           <div className="mx-auto grid max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-2 [&>*]:min-w-0">
             <div>
-              <p className={eyebrowClass}>Under the hood</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance">
                 Built like production software, for an audience of one.
               </h2>
@@ -223,7 +209,6 @@ export function LandingPage() {
 
         {/* ---------- Changelog ---------- */}
         <section id="changelog" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
-          <p className={eyebrowClass}>Changelog</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight">Shipped in small, daily-driven releases.</h2>
           <ol className="mt-12 grid gap-4 md:grid-cols-4">
             <Release version="v0.1" name="Core" status="shipped">
@@ -236,7 +221,7 @@ export function LandingPage() {
               Semesters, courses and class series, exams, assignments and clash warnings.
             </Release>
             <Release version="v0.4" name="Hardening" status="next">
-              Offline reading (done), JSON and .ics export, end-to-end tests in CI.
+              Offline reading.
             </Release>
           </ol>
         </section>
@@ -269,7 +254,6 @@ export function LandingPage() {
             <LogoMark className="size-5" /> Calendar
           </span>
           <span>Built by Matthew Tuurozeeng</span>
-          <span className="font-mono text-xs sm:ml-auto">React · TypeScript · Supabase</span>
         </div>
       </footer>
     </div>
