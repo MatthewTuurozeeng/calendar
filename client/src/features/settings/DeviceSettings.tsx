@@ -11,7 +11,7 @@ import { SettingRow } from './SettingsLayout'
 const PUSH_HINTS: Record<PushState, string> = {
   unsupported: "This browser can't receive push notifications.",
   'needs-install': 'On iPhone and iPad, add the app to your Home Screen first, then turn this on from there.',
-  'not-configured': 'Push needs a VAPID key in this build (VITE_VAPID_PUBLIC_KEY).',
+  'not-configured': 'Notifications are not set up for this device. Open the app on this device and allow notifications when prompted.',
   denied: 'Notifications are blocked for this site. Allow them in your browser or phone settings, then reload.',
   off: 'Get reminders on this device, even when the app is closed.',
   on: 'Reminders arrive on this device, even when the app is closed.',
