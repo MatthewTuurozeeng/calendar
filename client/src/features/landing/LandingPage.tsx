@@ -19,7 +19,6 @@ import { useAuth } from '../auth/auth-context'
 // so it follows light and dark mode.
 
 const linkClass = 'text-sm text-ink-muted hover:text-ink'
-const eyebrowClass = 'font-mono text-xs tracking-wider text-dusty-orange uppercase'
 
 export function LandingPage() {
   const { session } = useAuth()
@@ -36,9 +35,6 @@ export function LandingPage() {
           <div className="ml-4 hidden gap-6 md:flex">
             <a href="#features" className={linkClass}>
               Features
-            </a>
-            <a href="#engineering" className={linkClass}>
-              Under the hood
             </a>
             <a href="#changelog" className={linkClass}>
               Changelog
@@ -140,70 +136,6 @@ export function LandingPage() {
               Your data is yours. Row-level security on every table means nobody else can read or reference
               it.
             </Feature>
-          </div>
-        </section>
-
-        {/* ---------- Under the hood ---------- */}
-        <section id="engineering" className="scroll-mt-16 border-y border-line bg-surface">
-          <div className="mx-auto grid max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-2 [&>*]:min-w-0">
-            <div>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance">
-                Built like production software, for an audience of one.
-              </h2>
-              <p className="mt-4 text-ink-muted">
-                Calendars are full of edge cases: daylight saving, moved occurrences, retries that fire twice.
-                Each one is handled on purpose.
-              </p>
-              <ul className="mt-8 space-y-5">
-                <Detail title="DST-safe recurrence">
-                  Series expand in floating wall-clock time, so 10:00 every Monday stays at 10:00 when the clocks
-                  change.
-                </Detail>
-                <Detail title="One row per series">
-                  An RRULE plus exceptions for single edits and cancellations. No thousands of copied rows.
-                </Detail>
-                <Detail title="An idempotent reminder pipeline">
-                  A trigger cancels stale reminders inside the same write. A cron worker claims due rows with{' '}
-                  <code className="font-mono text-sm">SKIP LOCKED</code>, and idempotency keys mean nothing is
-                  sent twice.
-                </Detail>
-                <Detail title="Ownership enforced in the database">
-                  Row-level security and composite foreign keys, so one account can't point at another's rows.
-                </Detail>
-              </ul>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <CodeWindow title="lecture.rrule">
-                <Line muted>{'# CS 301: Mon & Wed, 09:00 Accra time, until exams'}</Line>
-                <Line>
-                  <Key>DTSTART</Key>;TZID=Africa/Accra:<Val>20260907T090000</Val>
-                </Line>
-                <Line>
-                  <Key>RRULE</Key>:FREQ=<Val>WEEKLY</Val>;BYDAY=<Val>MO,WE</Val>;UNTIL=<Val>20261204</Val>
-                </Line>
-                <Line muted>{'# "this event" edit → one exception row'}</Line>
-                <Line>
-                  <Key>EXDATE</Key>:<Val>20261014T090000</Val>
-                </Line>
-              </CodeWindow>
-
-              <CodeWindow title="zsh — npm test">
-                <Line>
-                  <span className="text-dusty-orange">$</span> npm test
-                </Line>
-                {['prefs', 'recurrence', 'reminder-plan', 'task-views', 'timetable', 'timing', 'today', 'validation'].map((name) => (
-                  <Line key={name}>
-                    <span className="text-[#8fc79a]">✓</span> tests/unit/{name}.test.ts
-                  </Line>
-                ))}
-                <Line>&nbsp;</Line>
-                <Line>
-                  <span className="text-[#a7a2aa]">Tests</span> <span className="text-[#8fc79a]">94 passed</span>
-                  <span className="text-[#a7a2aa]"> (94)</span>
-                </Line>
-              </CodeWindow>
-            </div>
           </div>
         </section>
 
@@ -431,44 +363,6 @@ function Feature({ icon, tint, title, children }: { icon: ReactNode; tint: strin
     </div>
   )
 }
-
-function Detail({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <li className="flex gap-3">
-      <span className="mt-1 grid size-5 shrink-0 place-items-center rounded-full bg-dusty-orange/25 text-ink">
-        <CheckIcon className="size-3" strokeWidth={3} />
-      </span>
-      <div>
-        <p className="font-medium">{title}</p>
-        <p className="mt-1 text-sm leading-relaxed text-ink-muted">{children}</p>
-      </div>
-    </li>
-  )
-}
-
-/** A terminal-style card. Always dark, in both themes, like a real editor. */
-function CodeWindow({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-[#39363c] bg-[#1d1c20] text-[#ece8ea] shadow-xl shadow-black/10">
-      <div className="flex items-center gap-3 border-b border-white/10 px-4 py-2.5">
-        <div className="flex gap-1.5" aria-hidden="true">
-          <span className="size-2.5 rounded-full bg-white/15" />
-          <span className="size-2.5 rounded-full bg-white/15" />
-          <span className="size-2.5 rounded-full bg-white/15" />
-        </div>
-        <span className="font-mono text-xs text-[#a7a2aa]">{title}</span>
-      </div>
-      <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-6">{children}</pre>
-    </div>
-  )
-}
-
-function Line({ muted, children }: { muted?: boolean; children: ReactNode }) {
-  return <div className={muted ? 'text-[#8a858d]' : ''}>{children}</div>
-}
-
-const Key = ({ children }: { children: ReactNode }) => <span className="text-[#acaec5]">{children}</span>
-const Val = ({ children }: { children: ReactNode }) => <span className="text-[#efa18a]">{children}</span>
 
 function Release({
   version,
